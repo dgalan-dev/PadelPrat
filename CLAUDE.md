@@ -19,7 +19,8 @@ El CI (`.github/workflows/ci.yml`) ejecuta lo mismo en cada push a `main` y en c
 - **Navegación**: Navigation 3 (no Navigation Compose).
   - Rutas en `navigation/Routes.kt`: `@Serializable data object/class XxxRoute : NavKey`.
   - Entradas en `navigation/AppNavigation.kt` dentro del `entryProvider`.
-  - La pantalla raíz la decide la sesión (`MainViewModel.sessionState`): con sesión, Home; sin ella, Login. Login y logout no navegan: cambian la sesión y la navegación reacciona sola. La pantalla de arranque (core-splashscreen) se mantiene mientras se lee la sesión.
+  - La pantalla raíz la decide la sesión (`MainViewModel.sessionState`): con sesión, `MainRoute`; sin ella, `LoginRoute`. Login y logout no navegan: cambian la sesión y la navegación reacciona sola. La pantalla de arranque (core-splashscreen) se mantiene mientras se lee la sesión.
+  - `MainRoute` es `MainScaffold`: la barra inferior con las pestañas de `TopLevelDestination` (Reservar, Mis reservas, Perfil). Las pestañas cambian dentro de esa entrada y conservan su estado; las pantallas de detalle (p. ej. confirmar reserva) se añaden como rutas nuevas en la pila raíz, por encima de la barra.
 - **Inyección de dependencias**: Hilt con KSP. `PadelPratApp` (`@HiltAndroidApp`) y `MainActivity` (`@AndroidEntryPoint`).
 - **Carpetas**:
   - `feature/<nombre>/`: pantallas y ViewModels de cada funcionalidad.

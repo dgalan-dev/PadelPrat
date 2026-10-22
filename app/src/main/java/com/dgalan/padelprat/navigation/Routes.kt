@@ -6,5 +6,6 @@ import kotlinx.serialization.Serializable
 @Serializable
 data object LoginRoute : NavKey
 
+/** Contenedor con la barra inferior y las pestañas (ver [TopLevelDestination]). */
 @Serializable
-data object HomeRoute : NavKey
+data object MainRoute : NavKey

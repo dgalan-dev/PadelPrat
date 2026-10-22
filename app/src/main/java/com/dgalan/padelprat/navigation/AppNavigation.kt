@@ -8,16 +8,15 @@ import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
-import com.dgalan.padelprat.feature.home.HomeScreen
 import com.dgalan.padelprat.feature.login.LoginScreen
 
 /**
- * La sesión decide la pantalla raíz: al iniciar sesión se pasa a Home y al cerrarla (o al caducar) se vuelve al
- * login, vaciando la pila para que no se pueda volver atrás.
+ * La sesión decide la pantalla raíz: al iniciar sesión se pasa a la principal (con la barra inferior) y al cerrarla
+ * (o al caducar) se vuelve al login, vaciando la pila para que no se pueda volver atrás.
  */
 @Composable
 fun AppNavigation(isLoggedIn: Boolean, modifier: Modifier = Modifier) {
-    val root = if (isLoggedIn) HomeRoute else LoginRoute
+    val root = if (isLoggedIn) MainRoute else LoginRoute
     val backStack = rememberNavBackStack(root)
 
     LaunchedEffect(root) {
@@ -37,7 +36,7 @@ fun AppNavigation(isLoggedIn: Boolean, modifier: Modifier = Modifier) {
         ),
         entryProvider = entryProvider {
             entry<LoginRoute> { LoginScreen() }
-            entry<HomeRoute> { HomeScreen() }
+            entry<MainRoute> { MainScaffold() }
         }
     )
 }

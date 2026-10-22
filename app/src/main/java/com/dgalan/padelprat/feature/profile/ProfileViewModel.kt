@@ -1,4 +1,4 @@
-package com.dgalan.padelprat.feature.home
+package com.dgalan.padelprat.feature.profile
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -8,7 +8,7 @@ import javax.inject.Inject
 import kotlinx.coroutines.launch
 
 @HiltViewModel
-class HomeViewModel @Inject constructor(private val authRepository: AuthRepository) : ViewModel() {
+class ProfileViewModel @Inject constructor(private val authRepository: AuthRepository) : ViewModel() {
 
     /** Al borrarse la sesión, la navegación raíz vuelve sola al login. */
     fun onLogoutClick() {

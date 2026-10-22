@@ -28,7 +28,7 @@ data class LoginUiState(
 
 /**
  * Si el login va bien no hace falta navegar desde aquí: la sesión pasa a existir y la navegación raíz cambia sola
- * a Home.
+ * a la pantalla principal.
  */
 @HiltViewModel
 class LoginViewModel @Inject constructor(private val authRepository: AuthRepository) : ViewModel() {
