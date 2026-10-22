@@ -29,6 +29,9 @@ El CI (`.github/workflows/ci.yml`) ejecuta lo mismo en cada push a `main` y en c
 - Versiones de librerías y plugins siempre en `gradle/libs.versions.toml`; usar solo versiones estables.
 - Estilo de ktlint `android_studio` (`.editorconfig`), con líneas de máximo 120 caracteres y comas finales.
 - Textos de la interfaz en `res/values/strings.xml`, en español; nada de textos fijos en el código.
+- Tema propio de Material 3 en `ui/theme/` (sin color dinámico), con modo claro y oscuro según el sistema. Usar siempre `MaterialTheme.colorScheme` y `MaterialTheme.typography`, sin colores ni tamaños de texto fijos.
+  - Colores: primario azul de pista (`#1B5FA8`) y terciario amarillo de bola (`#C8D92B`). `Color.kt` está generado con material-color-utilities; para cambiarlos hay que regenerar el esquema completo, no editar tonos sueltos.
+  - Tipografía: Montserrat (display, headline y `titleLarge`) e Inter (el resto), incluidas en `res/font/`.
 - Comentarios en español y solo cuando aporten algo que el código no dice.
 
 ## Decisiones del proyecto
@@ -36,3 +39,4 @@ El CI (`.github/workflows/ci.yml`) ejecuta lo mismo en cada push a `main` y en c
 - **Sin tests**: no añadir tests, dependencias de tests ni pasos de tests en el CI.
 - **Sin Dependabot ni detekt**.
 - **Git**: preguntar antes de cada commit. No hacer nunca `git push`; lo hace el usuario desde Android Studio.
+- **Commits sin atribución a Claude**: no añadir `Co-Authored-By: Claude` ni ninguna otra mención a Claude en los mensajes de commit.
