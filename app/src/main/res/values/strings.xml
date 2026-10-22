@@ -8,6 +8,11 @@
     <string name="login_show_password">Mostrar contraseña</string>
     <string name="login_hide_password">Ocultar contraseña</string>
     <string name="login_button">Iniciar sesión</string>
+    <string name="login_session_expired">Tu sesión ha caducado. Vuelve a iniciar sesión.</string>
+    <string name="login_error_invalid_credentials">Usuario o contraseña incorrectos</string>
+    <string name="login_error_network">No hay conexión. Revisa tu internet y vuelve a intentarlo.</string>
+    <string name="login_error_unknown">No se ha podido iniciar sesión. Vuelve a intentarlo más tarde.</string>
 
     <string name="home_title">Inicio</string>
+    <string name="home_logout">Cerrar sesión</string>
 </resources>

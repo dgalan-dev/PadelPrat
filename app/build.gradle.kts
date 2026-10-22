@@ -20,8 +20,8 @@ android {
         versionCode = 1
         versionName = "1.0"
 
-        // TODO: poner la URL real del backend
-        buildConfigField("String", "BASE_URL", "\"https://api.example.com/\"")
+        // Web de reservas del club (Syltek). Ver docs/syltek-api.md
+        buildConfigField("String", "BASE_URL", "\"https://prat.syltek.com/\"")
     }
 
     buildTypes {
@@ -67,6 +67,11 @@ dependencies {
     ksp(libs.hilt.compiler)
     implementation(libs.androidx.hilt.lifecycle.viewmodel.compose)
     implementation(libs.kotlinx.serialization.core)
+    implementation(libs.okhttp)
+    implementation(libs.okhttp.logging)
+    implementation(libs.androidx.datastore)
+    implementation(libs.tink.android)
+    implementation(libs.androidx.core.splashscreen)
     debugImplementation(libs.androidx.compose.ui.tooling)
     ktlintRuleset(libs.compose.rules.ktlint)
 }

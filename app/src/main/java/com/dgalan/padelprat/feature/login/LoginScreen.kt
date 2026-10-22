@@ -27,8 +27,10 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -40,12 +42,17 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.autofill.ContentType
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.contentType
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -61,11 +68,7 @@ import com.dgalan.padelprat.R
 import com.dgalan.padelprat.ui.theme.PadelPratTheme
 
 @Composable
-fun LoginScreen(
-    onLoginSuccess: () -> Unit,
-    modifier: Modifier = Modifier,
-    viewModel: LoginViewModel = hiltViewModel()
-) {
+fun LoginScreen(modifier: Modifier = Modifier, viewModel: LoginViewModel = hiltViewModel()) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     LightStatusBarIcons()
@@ -74,8 +77,7 @@ fun LoginScreen(
         onEmailChange = viewModel::onEmailChange,
         onPasswordChange = viewModel::onPasswordChange,
         onTogglePasswordVisibility = viewModel::onTogglePasswordVisibility,
-        // TODO: llamar al backend antes de navegar
-        onLoginClick = onLoginSuccess,
+        onLoginClick = viewModel::onLoginClick,
         modifier = modifier
     )
 }
@@ -264,12 +266,14 @@ private fun LoginForm(
     modifier: Modifier = Modifier
 ) {
     val fieldShape = RoundedCornerShape(12.dp)
+    val invalidCredentials = uiState.error == LoginError.InvalidCredentials
     // Iconos de email y candado siempre en azul para enlazar con la cabecera y la pista; el ojo, que es un botón,
     // se queda en el color por defecto
     val accent = MaterialTheme.colorScheme.primary
     val fieldColors = OutlinedTextFieldDefaults.colors(
         focusedLeadingIconColor = accent,
-        unfocusedLeadingIconColor = accent
+        unfocusedLeadingIconColor = accent,
+        errorLeadingIconColor = accent
     )
 
     Column(
@@ -285,8 +289,13 @@ private fun LoginForm(
             singleLine = true,
             shape = fieldShape,
             colors = fieldColors,
+            enabled = !uiState.isLoading,
+            isError = invalidCredentials,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
-            modifier = Modifier.fillMaxWidth()
+            // Para que los gestores de contraseñas lo rellenen
+            modifier = Modifier
+                .fillMaxWidth()
+                .semantics { contentType = ContentType.EmailAddress + ContentType.Username }
         )
         OutlinedTextField(
             value = uiState.password,
@@ -314,10 +323,30 @@ private fun LoginForm(
             } else {
                 PasswordVisualTransformation()
             },
+            enabled = !uiState.isLoading,
+            isError = invalidCredentials,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
-            keyboardActions = KeyboardActions(onDone = { if (uiState.canSubmit) onLoginClick() }),
-            modifier = Modifier.fillMaxWidth()
+            keyboardActions = KeyboardActions(onDone = { onLoginClick() }),
+            modifier = Modifier
+                .fillMaxWidth()
+                .semantics { contentType = ContentType.Password }
         )
+        // Un error del último intento tiene prioridad sobre el aviso de sesión caducada
+        val message = uiState.error?.messageRes()
+            ?: R.string.login_session_expired.takeIf { uiState.isSessionExpired }
+        if (message != null) {
+            Text(
+                text = stringResource(message),
+                color = if (uiState.error != null) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                // TalkBack lo lee en cuanto aparece
+                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }
+            )
+        }
         Button(
             onClick = onLoginClick,
             enabled = uiState.canSubmit,
@@ -326,9 +355,23 @@ private fun LoginForm(
                 .padding(top = 4.dp)
                 .height(48.dp)
         ) {
-            Text(stringResource(R.string.login_button), style = MaterialTheme.typography.labelLarge)
+            if (uiState.isLoading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp),
+                    color = LocalContentColor.current,
+                    strokeWidth = 2.dp
+                )
+            } else {
+                Text(stringResource(R.string.login_button), style = MaterialTheme.typography.labelLarge)
+            }
         }
     }
+}
+
+private fun LoginError.messageRes(): Int = when (this) {
+    LoginError.InvalidCredentials -> R.string.login_error_invalid_credentials
+    LoginError.Network -> R.string.login_error_network
+    LoginError.Unknown -> R.string.login_error_unknown
 }
 
 @Preview

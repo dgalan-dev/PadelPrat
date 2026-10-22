@@ -15,13 +15,22 @@ El CI (`.github/workflows/ci.yml`) ejecuta lo mismo en cada push a `main` y en c
 
 - **MVVM**: cada pantalla tiene un `XxxScreen` (Composable) y un `XxxViewModel` (`@HiltViewModel`) que expone un `StateFlow<XxxUiState>`.
   - `XxxScreen` obtiene el ViewModel con `hiltViewModel()`, recoge el estado con `collectAsStateWithLifecycle()` y delega en un `private XxxContent` sin ViewModel, que es el que tiene `@Preview`.
-  - La navegación se pasa como lambdas (`onLoginSuccess: () -> Unit`); las pantallas no conocen la pila de navegación.
+  - La navegación se pasa como lambdas (`onXxxClick: () -> Unit`); las pantallas no conocen la pila de navegación.
 - **Navegación**: Navigation 3 (no Navigation Compose).
   - Rutas en `navigation/Routes.kt`: `@Serializable data object/class XxxRoute : NavKey`.
   - Entradas en `navigation/AppNavigation.kt` dentro del `entryProvider`.
+  - La pantalla raíz la decide la sesión (`MainViewModel.sessionState`): con sesión, Home; sin ella, Login. Login y logout no navegan: cambian la sesión y la navegación reacciona sola. La pantalla de arranque (core-splashscreen) se mantiene mientras se lee la sesión.
 - **Inyección de dependencias**: Hilt con KSP. `PadelPratApp` (`@HiltAndroidApp`) y `MainActivity` (`@AndroidEntryPoint`).
-- **Carpetas por funcionalidad**: `feature/<nombre>/` contiene todo lo de esa funcionalidad. El tema está en `ui/theme/`.
-- **Backend**: solo hay un entorno (producción). La URL está en `BuildConfig.BASE_URL` (`app/build.gradle.kts`). No hay variantes de compilación (*flavors*).
+- **Carpetas**:
+  - `feature/<nombre>/`: pantallas y ViewModels de cada funcionalidad.
+  - `data/<área>/`: repositorios y fuentes de datos remotas (`XxxRemoteDataSource`), con resultados como `sealed interface` (p. ej. `LoginResult`).
+  - `core/network/`: cliente HTTP y sesión. `ui/theme/`: tema.
+- **Backend**: no hay API propia; es la web de reservas del club (Syltek, `https://prat.syltek.com/`), replicada por ingeniería inversa. **Antes de tocar cualquier petición, leer `docs/syltek-api.md`**: rutas, formularios, selectores HTML y reglas (p. ej. la pre-reserva bloquea la pista 8 minutos, anular es un GET que no se puede reintentar).
+  - Respuestas en HTML y formularios `x-www-form-urlencoded`: OkHttp directo, sin Retrofit. Jsoup se añadirá cuando haga falta leer HTML.
+  - Sesión: solo una cookie (`Syltek.SESSION_COOKIE`, 6 meses) guardada cifrada con Tink en DataStore (`PersistentCookieJar`). **No se guarda la contraseña.** La sesión está excluida de las copias de seguridad (`res/xml`).
+  - `followRedirects(false)`: un 303 a `/customer/login` significa sesión caducada; `SessionExpiredInterceptor` borra la sesión y la app vuelve al login.
+  - Logs de red solo en debug y a nivel `BASIC` (método, URL y código). Nunca registrar cabeceras, cookies ni contraseñas.
+  - Un solo entorno (producción), en `BuildConfig.BASE_URL`. No hay variantes de compilación (*flavors*).
 - El login no tiene registro.
 
 ## Convenciones
