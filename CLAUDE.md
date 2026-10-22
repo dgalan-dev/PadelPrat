@@ -27,10 +27,10 @@ El CI (`.github/workflows/ci.yml`) ejecuta lo mismo en cada push a `main` y en c
 ## Convenciones
 
 - Versiones de librerías y plugins siempre en `gradle/libs.versions.toml`; usar solo versiones estables.
-- Estilo de ktlint `android_studio` (`.editorconfig`), con líneas de máximo 120 caracteres y comas finales.
+- Estilo de ktlint `android_studio` (`.editorconfig`), con líneas de máximo 120 caracteres. Pasar `./gradlew ktlintFormat` antes de dar un cambio por bueno.
 - Textos de la interfaz en `res/values/strings.xml`, en español; nada de textos fijos en el código.
 - Tema propio de Material 3 en `ui/theme/` (sin color dinámico), con modo claro y oscuro según el sistema. Usar siempre `MaterialTheme.colorScheme` y `MaterialTheme.typography`, sin colores ni tamaños de texto fijos.
-  - Colores: primario azul de pista (`#1B5FA8`) y terciario amarillo de bola (`#C8D92B`). `Color.kt` está generado con material-color-utilities; para cambiarlos hay que regenerar el esquema completo, no editar tonos sueltos.
+  - Colores (de los mocks de diseño): primario azul `#1E4FA3` y terciario lima de bola `#B8E63A`. `Color.kt` está generado con material-color-utilities y tiene algunos tonos fijados a mano con los valores exactos del mock (ver la cabecera del archivo); para cambiarlos hay que regenerar el esquema completo, no editar tonos sueltos.
   - Tipografía: Montserrat (display, headline y `titleLarge`) e Inter (el resto), incluidas en `res/font/`.
 - Comentarios en español y solo cuando aporten algo que el código no dice.
 

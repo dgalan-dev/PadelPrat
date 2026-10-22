@@ -1,9 +1,13 @@
 <resources>
     <string name="app_name">Padel Prat</string>
 
+    <string name="login_subtitle">Reserva tu pista en segundos</string>
     <string name="login_email">Email</string>
+    <string name="login_email_placeholder">correo@ejemplo.com</string>
     <string name="login_password">Contraseña</string>
-    <string name="login_button">Entrar</string>
+    <string name="login_show_password">Mostrar contraseña</string>
+    <string name="login_hide_password">Ocultar contraseña</string>
+    <string name="login_button">Iniciar sesión</string>
 
     <string name="home_title">Inicio</string>
 </resources>

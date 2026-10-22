@@ -8,7 +8,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
-data class LoginUiState(val email: String = "", val password: String = "") {
+data class LoginUiState(val email: String = "", val password: String = "", val isPasswordVisible: Boolean = false) {
     val canSubmit: Boolean get() = email.isNotBlank() && password.isNotBlank()
 }
 
@@ -24,5 +24,9 @@ class LoginViewModel @Inject constructor() : ViewModel() {
 
     fun onPasswordChange(password: String) {
         _uiState.update { it.copy(password = password) }
+    }
+
+    fun onTogglePasswordVisibility() {
+        _uiState.update { it.copy(isPasswordVisible = !it.isPasswordVisible) }
     }
 }
