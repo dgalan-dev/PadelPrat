@@ -26,9 +26,10 @@ android {
 
     buildTypes {
         release {
+            // R8 sobre toda la app. Limitarlo a unos paquetes (packageScope, como traía la plantilla) rompía el arranque:
+            // R8 cambiaba la visibilidad de clases de Kotlin que OkHttp, fuera de ese ámbito, necesita
             optimization {
                 enable = true
-                packageScope = setOf("androidx.**", "kotlin.**", "kotlinx.**")
             }
         }
     }
