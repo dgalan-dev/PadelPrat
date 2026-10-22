@@ -124,9 +124,14 @@ El objeto está en un `<script>` justo antes de
 `timetableTable.init(timetable, "czTimetable", …)`. Es JavaScript, no JSON: claves sin comillas,
 comillas simples y `new Date(año, mes, día, h, m, s)` con el mes empezando en 0.
 
-Receta: extraerlo con una regex hasta `};`, cambiar cada `new Date(…)` por `null` y leerlo con
-`org.json.JSONObject` (incluido en Android, acepta claves sin comillas y comillas simples). El modo
-`isLenient` de kotlinx.serialization no admite comillas simples. Usar siempre los campos `*Utc`.
+Receta: extraerlo con una regex hasta `};`, cambiar cada `new Date(…)` por `null`, poner comillas a
+las claves numéricas y leerlo con `org.json.JSONObject` (incluido en Android, acepta claves sin
+comillas y comillas simples). El modo `isLenient` de kotlinx.serialization no admite comillas
+simples. Usar siempre los campos `*Utc`.
+
+> **Claves numéricas:** `org.json` falla con `resources:{1477:{…}}` ("Names must be strings, but 1477
+> is of type java.lang.Integer"). Antes de leerlo, cambiar `{1477:` por `{"1477":` (regex
+> `([{,]\s*)(\d+)\s*:` → `$1"$2":`). Comprobado con la parrilla real el 23/10/2026.
 
 ### 4.3 Campos de `timetable`
 
