@@ -1,3 +1,9 @@
 <resources>
     <string name="app_name">Padel Prat</string>
+
+    <string name="login_email">Email</string>
+    <string name="login_password">Contraseña</string>
+    <string name="login_button">Entrar</string>
+
+    <string name="home_title">Inicio</string>
 </resources>
