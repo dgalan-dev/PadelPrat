@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -54,6 +55,8 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -131,13 +134,17 @@ private fun BookingContent(
     onRetry: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val listState = rememberLazyListState()
-    val filtersPinned by remember { derivedStateOf { listState.firstVisibleItemIndex > 0 } }
-    // Tarjetas que ya han hecho su entrada: cada día y franja se anima una sola vez, y al volver con scroll a una
-    // tarjeta ya vista no se repite
-    val playedEntrances = remember(uiState.selectedDay, uiState.dayPart, uiState.durationMinutes) {
-        mutableSetOf<Int>()
-    }
+    // Cada día empieza arriba: el estado de scroll es nuevo en el mismo instante en que cambia el contenido. Si se
+    // arrastrara la posición del día anterior, la lista saltaba al cargar el nuevo (con solo 3 siluetas no cabía).
+    val listState = remember(uiState.selectedDay) { LazyListState() }
+    val filtersPinned by remember(listState) { derivedStateOf { listState.firstVisibleItemIndex > 0 } }
+
+    // Tarjetas que ya han hecho su entrada, por día y filtros: al volver a un día ya visto o con scroll a una tarjeta
+    // ya vista no se repite. Tras una recarga (siluetas) sí vuelven a entrar.
+    val entranceKey = EntranceKey(uiState.selectedDay, uiState.dayPart, uiState.durationMinutes)
+    val entrancesByFilters = remember { mutableMapOf<EntranceKey, MutableSet<Int>>() }
+    if (uiState.content is BookingContent.Loading) entrancesByFilters.remove(entranceKey)
+    val playedEntrances = entrancesByFilters.getOrPut(entranceKey) { mutableSetOf() }
     val pullState = rememberPullToRefreshState()
     // Borde inferior de los filtros dentro de la lista, para colocar ahí el indicador de refresco
     var filtersBottom by remember { mutableIntStateOf(0) }
@@ -183,7 +190,7 @@ private fun BookingContent(
             }
             when (val content = uiState.content) {
                 BookingContent.Loading -> items(SKELETON_CARDS, key = { "skeleton$it" }) {
-                    SkeletonCourtCard(Modifier.padding(horizontal = 16.dp, vertical = 5.dp).animateItem())
+                    SkeletonCourtCard(Modifier.padding(horizontal = 16.dp, vertical = 5.dp))
                 }
 
                 is BookingContent.Error -> item(key = "error") { ErrorState(content.error, onRetry) }
@@ -197,6 +204,8 @@ private fun BookingContent(
         }
     }
 }
+
+private data class EntranceKey(val day: LocalDate, val dayPart: DayPart, val durationMinutes: Int)
 
 private const val SKELETON_CARDS = 3
 
@@ -216,7 +225,9 @@ private fun LazyListScope.courtItems(
             animate = animate,
             modifier = Modifier
                 .padding(horizontal = 16.dp, vertical = 5.dp)
-                .animateItem(fadeInSpec = null, placementSpec = spring(), fadeOutSpec = tween(150))
+                // Sin fundido de salida: las tarjetas que se iban se seguían dibujando en su posición antigua y, si la
+                // lista saltaba, aparecían por encima del título. Las que se quedan sí se recolocan con animación.
+                .animateItem(fadeInSpec = null, placementSpec = spring(), fadeOutSpec = null)
         ) {
             CourtCard(courtSlots, selectedSlot, onSlotClick)
         }
