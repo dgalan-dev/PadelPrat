@@ -119,6 +119,7 @@ fun BookingScreen(modifier: Modifier = Modifier, viewModel: BookingViewModel = h
     uiState.sheet?.let { sheet ->
         ReservationBottomSheet(
             sheet = sheet,
+            limitReached = uiState.reservationLimitReached,
             onConfirmClick = viewModel::onConfirmClick,
             onDismiss = viewModel::onSheetDismiss
         )
@@ -205,6 +206,11 @@ private fun BookingContent(
                     modifier = Modifier.onGloballyPositioned { filtersBottom = it.boundsInParent().bottom.toInt() }
                 )
             }
+            if (uiState.reservationLimitReached) {
+                item(key = "limit") {
+                    LimitBanner(Modifier.padding(horizontal = 16.dp, vertical = 5.dp))
+                }
+            }
             when (val content = uiState.content) {
                 BookingContent.Loading -> items(SKELETON_CARDS, key = { "skeleton$it" }) {
                     SkeletonCourtCard(Modifier.padding(horizontal = 16.dp, vertical = 5.dp))
@@ -225,6 +231,27 @@ private fun BookingContent(
 private data class EntranceKey(val day: LocalDate, val dayPart: DayPart, val durationMinutes: Int)
 
 private const val SKELETON_CARDS = 3
+
+/** Aviso de que se ha llegado al máximo de reservas del club: se puede mirar, pero no reservar otra. */
+@Composable
+private fun LimitBanner(modifier: Modifier = Modifier) {
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        modifier = modifier.fillMaxWidth()
+    ) {
+        Text(
+            text = pluralStringResource(
+                R.plurals.reservation_limit_reached,
+                Syltek.MAX_ACTIVE_RESERVATIONS,
+                Syltek.MAX_ACTIVE_RESERVATIONS
+            ),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSecondaryContainer,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+        )
+    }
+}
 
 /** Solo las primeras tarjetas entran escalonadas: las de más abajo ya aparecen al hacer scroll. */
 private const val STAGGERED_CARDS = 6

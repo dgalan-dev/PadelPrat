@@ -51,6 +51,10 @@
     <string name="reservation_error_network">No hay conexión y no se ha reservado nada. Vuelve a intentarlo.</string>
     <string name="reservation_error_uncertain">Se ha cortado la conexión al confirmar y no sabemos si la reserva se ha hecho. Compruébalo en Mis reservas antes de volver a intentarlo.</string>
     <string name="reservation_error_incomplete">El club pide un paso más (por ejemplo, elegir cómo pagar) que la app todavía no hace, así que la reserva no está hecha. Termínala desde la web del club.</string>
+    <plurals name="reservation_limit_reached">
+        <item quantity="one">Ya tienes %d reserva, el máximo del club. Anúlala en Mis reservas para poder reservar otra.</item>
+        <item quantity="other">Ya tienes %d reservas, el máximo del club. Anula una en Mis reservas para poder reservar otra.</item>
+    </plurals>
     <string name="reservation_error_unknown">No se ha podido hacer la reserva. Vuelve a intentarlo más tarde.</string>
 
     <string name="reservations_title">Mis reservas</string>

@@ -42,6 +42,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
@@ -61,7 +62,12 @@ import kotlinx.coroutines.launch
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ReservationBottomSheet(sheet: ReservationSheet, onConfirmClick: () -> Unit, onDismiss: () -> Unit) {
+fun ReservationBottomSheet(
+    sheet: ReservationSheet,
+    limitReached: Boolean,
+    onConfirmClick: () -> Unit,
+    onDismiss: () -> Unit
+) {
     val isBooking by rememberUpdatedState(sheet.status == ReservationStatus.Booking)
     val sheetState = rememberModalBottomSheetState(
         skipPartiallyExpanded = true,
@@ -88,7 +94,7 @@ fun ReservationBottomSheet(sheet: ReservationSheet, onConfirmClick: () -> Unit, 
                 if (success && status is ReservationStatus.Success) {
                     SuccessContent(sheet, status.total, onDone = close)
                 } else {
-                    DetailsContent(sheet, onConfirmClick = onConfirmClick, onClose = close)
+                    DetailsContent(sheet, limitReached, onConfirmClick = onConfirmClick, onClose = close)
                 }
             }
         }
@@ -98,6 +104,7 @@ fun ReservationBottomSheet(sheet: ReservationSheet, onConfirmClick: () -> Unit, 
 @Composable
 private fun DetailsContent(
     sheet: ReservationSheet,
+    limitReached: Boolean,
     onConfirmClick: () -> Unit,
     onClose: () -> Unit,
     modifier: Modifier = Modifier
@@ -124,12 +131,24 @@ private fun DetailsContent(
         CourtInfoRow(sheet)
         Spacer(Modifier.height(24.dp))
 
+        // Si el club ha dado el motivo (p. ej. el límite de reservas), se muestra tal cual
         if (status is ReservationStatus.Failed) {
             Text(
-                text = stringResource(status.error.messageRes()),
+                text = status.message ?: stringResource(status.error.messageRes()),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.error,
                 modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }
+            )
+            Spacer(Modifier.height(16.dp))
+        } else if (limitReached) {
+            Text(
+                text = pluralStringResource(
+                    R.plurals.reservation_limit_reached,
+                    Syltek.MAX_ACTIVE_RESERVATIONS,
+                    Syltek.MAX_ACTIVE_RESERVATIONS
+                ),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(Modifier.height(16.dp))
         }
@@ -142,7 +161,7 @@ private fun DetailsContent(
         if (canConfirm) {
             Button(
                 onClick = onConfirmClick,
-                enabled = !booking,
+                enabled = !booking && !limitReached,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(48.dp)
@@ -335,5 +354,6 @@ private fun ReservationError.messageRes(): Int = when (this) {
     ReservationError.Network -> R.string.reservation_error_network
     ReservationError.Uncertain -> R.string.reservation_error_uncertain
     ReservationError.Incomplete -> R.string.reservation_error_incomplete
+    ReservationError.Rejected -> R.string.reservation_error_unknown
     ReservationError.Unknown -> R.string.reservation_error_unknown
 }

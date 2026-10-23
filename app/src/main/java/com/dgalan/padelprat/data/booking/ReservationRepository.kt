@@ -14,6 +14,9 @@ sealed interface ReservationResult {
     /** El hueco ya no se puede reservar (lo ha cogido otro socio o ya no cabe la duración). */
     data object SlotUnavailable : ReservationResult
 
+    /** La web no deja reservar y da el motivo (p. ej. el límite de reservas del club), que se muestra tal cual. */
+    data class Rejected(val message: String) : ReservationResult
+
     /** Sin conexión antes de confirmar: no se ha reservado nada. */
     data object NetworkError : ReservationResult
 
@@ -80,6 +83,8 @@ class ReservationRepository @Inject constructor(
         is ReservationStep.Ok -> ReservationResult.UnknownError
 
         ReservationStep.SlotUnavailable -> ReservationResult.SlotUnavailable
+
+        is ReservationStep.Rejected -> ReservationResult.Rejected(message)
 
         ReservationStep.SessionExpired -> ReservationResult.SessionExpired
 

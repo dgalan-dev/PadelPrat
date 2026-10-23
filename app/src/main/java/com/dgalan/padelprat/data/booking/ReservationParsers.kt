@@ -55,6 +55,18 @@ object ReservationParsers {
     }
 
     /**
+     * Mensaje de error que la web muestra en la página (p. ej. al superar el límite de reservas del club). Usa el
+     * mismo aviso que el error del login (`.c-message-indicator--danger`), o el de advertencia si es ese el que sale.
+     * `null` si la página no trae ninguno.
+     */
+    fun parseErrorMessage(html: String): String? = Jsoup.parse(html)
+        .selectFirst(
+            ".c-message-indicator--danger .c-message-indicator__content, " +
+                ".c-message-indicator--warning .c-message-indicator__content"
+        )
+        ?.text()?.trim()?.ifEmpty { null }
+
+    /**
      * Página a la que redirige la confirmación (apartado 5.5). Solo es una reserva hecha si muestra el mensaje de
      * éxito: con cuentas que pagan, esta misma página enseña el importe y pide elegir cómo pagar, y hasta entonces
      * la reserva no queda hecha.

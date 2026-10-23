@@ -20,6 +20,9 @@ sealed interface ReservationStep<out T> {
     /** El servidor ha redirigido a la parrilla: el hueco ya no es válido. */
     data object SlotUnavailable : ReservationStep<Nothing>
 
+    /** La web no deja reservar y explica por qué (p. ej. el límite de reservas del club). */
+    data class Rejected(val message: String) : ReservationStep<Nothing>
+
     /** Redirección al login: [com.dgalan.padelprat.core.network.SessionExpiredInterceptor] ya ha borrado la sesión. */
     data object SessionExpired : ReservationStep<Nothing>
 
@@ -108,9 +111,12 @@ class ReservationRemoteDataSource @Inject constructor(private val client: OkHttp
         }
     }
 
+    /** Sin formulario, la página puede traer el motivo (p. ej. el límite de reservas): se devuelve tal cual. */
     private fun Response.toForm(): ReservationStep<ReservationForm> {
         if (!isSuccessful) return ReservationStep.UnknownError
-        return ReservationParsers.parseForm(body.string())?.let { ReservationStep.Ok(it) }
+        val html = body.string()
+        ReservationParsers.parseForm(html)?.let { return ReservationStep.Ok(it) }
+        return ReservationParsers.parseErrorMessage(html)?.let { ReservationStep.Rejected(it) }
             ?: ReservationStep.UnknownError
     }
 

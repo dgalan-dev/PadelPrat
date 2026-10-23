@@ -17,6 +17,7 @@ import com.dgalan.padelprat.data.booking.TimetableRepository
 import com.dgalan.padelprat.data.booking.TimetableResult
 import com.dgalan.padelprat.data.profile.ProfileRepository
 import com.dgalan.padelprat.data.reservations.ReservationsChangeNotifier
+import com.dgalan.padelprat.data.reservations.ReservationsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.time.Instant
 import java.time.LocalDate
@@ -54,6 +55,9 @@ enum class ReservationError {
 
     /** La web pide un paso más (p. ej. elegir cómo pagar) que la app aún no hace: la reserva no está hecha. */
     Incomplete,
+
+    /** La web no deja reservar y da el motivo, que se muestra tal cual (en [ReservationStatus.Failed.message]). */
+    Rejected,
     Unknown
 }
 
@@ -64,7 +68,7 @@ sealed interface ReservationStatus {
 
     data class Success(val total: String?) : ReservationStatus
 
-    data class Failed(val error: ReservationError) : ReservationStatus
+    data class Failed(val error: ReservationError, val message: String? = null) : ReservationStatus
 }
 
 /** Hoja de reserva abierta sobre un hueco libre. Abrirla no bloquea nada: solo se reserva al confirmar. */
@@ -86,7 +90,9 @@ data class BookingUiState(
     val content: BookingContent = BookingContent.Loading,
     val sheet: ReservationSheet? = null,
     /** Para el saludo; `null` hasta que llegan los datos del perfil. */
-    val firstName: String? = null
+    val firstName: String? = null,
+    /** Ya tiene el máximo de reservas activas que permite el club: se avisa y no se deja confirmar otra. */
+    val reservationLimitReached: Boolean = false
 )
 
 /** Lo habitual es reservar un partido de hora y media. */
@@ -97,7 +103,8 @@ class BookingViewModel @Inject constructor(
     private val repository: TimetableRepository,
     private val reservationRepository: ReservationRepository,
     changeNotifier: ReservationsChangeNotifier,
-    profileRepository: ProfileRepository
+    profileRepository: ProfileRepository,
+    private val reservationsRepository: ReservationsRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(initialState())
@@ -114,10 +121,20 @@ class BookingViewModel @Inject constructor(
         }
         // Perfil también los pide; si ya están, no hace falta otra petición
         if (profileRepository.profile.value == null) viewModelScope.launch { profileRepository.refresh() }
+        viewModelScope.launch {
+            reservationsRepository.activeCount.collect { count ->
+                _uiState.update { it.copy(reservationLimitReached = (count ?: 0) >= Syltek.MAX_ACTIVE_RESERVATIONS) }
+            }
+        }
+        if (reservationsRepository.activeCount.value == null) {
+            viewModelScope.launch { reservationsRepository.refreshActiveCount() }
+        }
         // Si las reservas cambian (p. ej. se anula una en Mis reservas), las parrillas guardadas ya no valen. Con la
         // hoja abierta no se recarga: al cerrarla ya se recarga si hace falta.
         viewModelScope.launch {
             changeNotifier.changes.collect {
+                // Al reservar o anular cambia también cuántas reservas activas hay
+                launch { reservationsRepository.refreshActiveCount() }
                 timetables.clear()
                 if (_uiState.value.sheet == null) load(_uiState.value.selectedDay)
             }
@@ -155,8 +172,10 @@ class BookingViewModel @Inject constructor(
 
     /** Aquí sí se reserva de verdad: pre-reserva y confirmación seguidas. Nunca se reintenta solo. */
     fun onConfirmClick() {
-        val sheet = _uiState.value.sheet ?: return
+        val state = _uiState.value
+        val sheet = state.sheet ?: return
         if (sheet.status == ReservationStatus.Booking || sheet.status is ReservationStatus.Success) return
+        if (state.reservationLimitReached) return
         updateSheet { it.copy(status = ReservationStatus.Booking) }
 
         viewModelScope.launch {
@@ -172,6 +191,8 @@ class BookingViewModel @Inject constructor(
                 ReservationResult.Uncertain -> ReservationStatus.Failed(ReservationError.Uncertain)
 
                 ReservationResult.Incomplete -> ReservationStatus.Failed(ReservationError.Incomplete)
+
+                is ReservationResult.Rejected -> ReservationStatus.Failed(ReservationError.Rejected, result.message)
 
                 ReservationResult.UnknownError -> ReservationStatus.Failed(ReservationError.Unknown)
 
@@ -192,7 +213,11 @@ class BookingViewModel @Inject constructor(
         _uiState.update { it.copy(sheet = null) }
         val gridMayHaveChanged = when (val status = sheet.status) {
             is ReservationStatus.Success -> true
-            is ReservationStatus.Failed -> status.error != ReservationError.Network
+
+            // Ni sin conexión ni con un rechazo del club ha cambiado nada en la parrilla
+            is ReservationStatus.Failed ->
+                status.error != ReservationError.Network && status.error != ReservationError.Rejected
+
             else -> false
         }
         if (gridMayHaveChanged) onRefresh()

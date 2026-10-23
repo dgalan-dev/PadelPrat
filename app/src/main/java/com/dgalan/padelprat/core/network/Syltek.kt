@@ -30,6 +30,9 @@ object Syltek {
     const val RESERVATION_DETAIL_PATH = "customerzone/showreservation/"
     const val CANCEL_RESERVATION_PATH = "customerzone/cancelReservation/"
 
+    /** El club solo deja tener a la vez este número de reservas activas; al anular una se puede volver a reservar. */
+    const val MAX_ACTIVE_RESERVATIONS = 2
+
     /** "Mi Cuenta": datos del usuario (solo lectura en la app). */
     const val ACCOUNT_PATH = "customerzone/account/"
 

@@ -320,6 +320,21 @@ date=26%2F10%2F2026+16%3A30%3A00&idResource=1477&idReservation=489387&paymentPen
 - **Sin probar:** si enviar `paymentPending=true` con una cuenta que no paga también confirma (lo esperable,
   importe 0,00 € "a pagar en el club"), y cómo se ve el formulario de una cuenta que paga (HTML de los botones).
 
+### 5.4 ter Límite de reservas del club
+
+> **Regla del club (dicha por el usuario, 23/10/2026):** cada socio puede tener como máximo **2 reservas
+> activas** a la vez. Al anular una, se puede volver a reservar. Si se intenta una tercera, la web muestra un
+> mensaje y no deja reservar. **Sin capturar todavía:** en qué paso sale (pre-reserva o confirmación), la ruta
+> y el texto exacto del mensaje.
+
+- La app lo evita antes de enviar nada: cuenta las reservas activas del listado (próximas, `Reservada` y sin
+  terminar) y, si ya hay 2, no deja confirmar y lo explica. Así tampoco se bloquea la pista con una
+  pre-reserva que va a fallar.
+- Por si el servidor rechaza igualmente: si la pre-reserva no devuelve formulario, la app busca el aviso de
+  error de la página (`.c-message-indicator--danger` o `--warning`, `.c-message-indicator__content`) y lo
+  muestra tal cual. Que el mensaje del límite use ese aviso **es una suposición** (es el mismo que usa el error
+  del login); confirmarlo cuando se capture.
+
 ### 5.5 Página de confirmación
 
 `GET /booking/confirm?prereservationCode=<token>` (recargable, solo lectura).
@@ -542,6 +557,7 @@ interface PadelRepository {
 
 - [ ] Error al confirmar con la pre-reserva caducada (más de 8 minutos).
 - [ ] Error al confirmar si otro socio ocupa el hueco.
+- [ ] Mensaje al superar el límite de 2 reservas activas (ver 5.4 ter): paso, ruta y selector del mensaje.
 - [ ] Confirmar con `duration=90` sin pasar por `updateduration`.
 - [ ] Anular fuera de plazo o con penalización.
 - [ ] Reservas de pago: "Pagar en el club" documentado (5.4 bis); falta probar `paymentPending=true` con una cuenta que no paga y capturar "Pagar con tarjeta". Jugadores obligatorios y promociones, sin probar.
