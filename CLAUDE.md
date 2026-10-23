@@ -11,6 +11,13 @@ App Android de pádel, en Kotlin y Jetpack Compose (Material 3). Paquete: `com.d
 
 El CI (`.github/workflows/ci.yml`) ejecuta lo mismo en cada push a `main` y en cada PR.
 
+### Releases
+
+Se publican en GitHub Releases (no en Google Play). Para sacar una versión: subir `versionCode` y `versionName` en `app/build.gradle.kts`, commitear y subir un tag `vX.Y.Z` igual a `versionName`. El workflow `.github/workflows/release.yml` comprueba que coinciden, compila la release firmada y la publica con el APK (`PadelPrat-X.Y.Z.apk`).
+
+- La clave de firma (`padelprat-release.jks`, alias `padelprat`) **no está en el repositorio**: está en los secretos de GitHub `RELEASE_KEYSTORE_BASE64` y `RELEASE_KEYSTORE_PASSWORD`, y en una copia del usuario fuera del proyecto. Si se pierde, las nuevas versiones no se pueden instalar encima de las anteriores.
+- Sin la clave, `assembleRelease` genera `app-release-unsigned.apk`; para probarla en un móvil se firma a mano con la clave de depuración (apksigner). Una app firmada con una clave no se instala encima de otra firmada con la otra: hay que desinstalar y se pierden la sesión y las programaciones.
+
 ## Arquitectura
 
 - **MVVM**: cada pantalla tiene un `XxxScreen` (Composable) y un `XxxViewModel` (`@HiltViewModel`) que expone un `StateFlow<XxxUiState>`.

@@ -3,10 +3,8 @@
 Reservar automáticamente una pista de un día que todavía no se puede reservar, en cuanto la web abra ese día.
 Decisiones tomadas al final.
 
-> **Aviso:** `docs/syltek-api.md` (Limitaciones) desaconseja automatizar reservas al abrirse el plazo: da
-> ventaja frente a quien reserva a mano y puede ir contra las normas del club. El usuario decide seguir
-> (23/10/2026): uso solo personal, con el límite de 2 reservas del club. Por eso la app **no se salta el plazo**
-> (espera a que la web abra el día), **consulta poco** y solo alrededor de la apertura, y **respeta el límite**.
+La app **no se salta el plazo** (espera a que la web abra el día), **consulta poco** y solo alrededor de la
+apertura, y **respeta el límite** de 2 reservas activas del club.
 
 ## Cómo abre la web cada día
 
@@ -81,7 +79,7 @@ Decisiones tomadas al final.
 
 ## Decisiones tomadas (23/10/2026)
 
-- Seguir adelante pese al aviso del documento (uso solo personal, con el límite de 2 reservas).
+- Seguir adelante, respetando el límite de 2 reservas, y publicarla en GitHub con la función incluida.
 - Hasta 3 pistas por programación, a la hora elegida.
 - Programar hasta 14 días por delante.
 - Las programadas en Próximas, con un estilo distinto.

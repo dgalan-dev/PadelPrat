@@ -1,0 +1,55 @@
+name: Release
+
+# Al subir un tag vX.Y.Z: comprueba, compila la release firmada y la publica en GitHub con el APK
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      - name: Check version
+        run: |
+          version=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::El tag $GITHUB_REF_NAME no coincide con versionName ($version)"
+            exit 1
+          fi
+
+      - name: Decode keystore
+        run: echo "$RELEASE_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.jks"
+        env:
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+
+      - name: Build
+        run: ./gradlew ktlintCheck lintDebug assembleRelease
+        env:
+          ORG_GRADLE_PROJECT_padelpratStoreFile: ${{ runner.temp }}/release.jks
+          ORG_GRADLE_PROJECT_padelpratStorePassword: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+
+      # Sin firma, Gradle lo llamaría app-release-unsigned.apk y este paso fallaría
+      - name: Publish
+        run: |
+          apk="PadelPrat-${GITHUB_REF_NAME#v}.apk"
+          cp app/build/outputs/apk/release/app-release.apk "$apk"
+          gh release create "$GITHUB_REF_NAME" "$apk" --title "PadelPrat ${GITHUB_REF_NAME#v}" --generate-notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Remove keystore
+        if: always()
+        run: rm -f "$RUNNER_TEMP/release.jks"

@@ -18,14 +18,29 @@ android {
         minSdk = 26
         targetSdk = 37
         versionCode = 1
-        versionName = "1.0"
+        versionName = "1.0.0"
 
         // Web de reservas del club (Syltek). Ver docs/syltek-api.md
         buildConfigField("String", "BASE_URL", "\"https://prat.syltek.com/\"")
     }
 
+    // Firma de las releases: solo en el workflow de releases (.github/workflows/release.yml), que pasa la clave con
+    // las propiedades padelpratStoreFile y padelpratStorePassword. Sin ellas, la release sale sin firmar
+    val releaseStoreFile = providers.gradleProperty("padelpratStoreFile").orNull
+    signingConfigs {
+        if (releaseStoreFile != null) {
+            create("release") {
+                storeFile = file(releaseStoreFile)
+                storePassword = providers.gradleProperty("padelpratStorePassword").get()
+                keyAlias = "padelprat"
+                keyPassword = storePassword
+            }
+        }
+    }
+
     buildTypes {
         release {
+            signingConfig = signingConfigs.findByName("release")
             // R8 sobre toda la app. Limitarlo a unos paquetes (packageScope, como traía la plantilla) rompía el arranque:
             // R8 cambiaba la visibilidad de clases de Kotlin que OkHttp, fuera de ese ámbito, necesita
             optimization {

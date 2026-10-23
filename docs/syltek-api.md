@@ -549,8 +549,6 @@ interface PadelRepository {
   pequeñas con tests sobre HTML guardado.
 - **Textos en castellano:** fechas y estados dependen del idioma de la sesión
   (`/system/culture/switchlanguage/es`).
-- **Uso personal:** app para uso propio con tu cuenta. No publicarla con la marca del club ni
-  automatizar reservas al abrirse el plazo.
 - **Credenciales:** nunca la contraseña en claro ni cookies en los logs.
 
 ### No probado
