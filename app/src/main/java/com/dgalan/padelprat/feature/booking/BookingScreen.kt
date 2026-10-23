@@ -1,5 +1,7 @@
 package com.dgalan.padelprat.feature.booking
 
+import androidx.compose.animation.animateBounds
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
@@ -8,7 +10,6 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -16,7 +17,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -55,20 +58,25 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateSetOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.LookaheadScope
 import androidx.compose.ui.layout.boundsInParent
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -180,6 +188,8 @@ private fun BookingContent(
     val entrancesByFilters = remember { mutableMapOf<EntranceKey, MutableSet<Int>>() }
     if (uiState.content is BookingContent.Loading) entrancesByFilters.remove(entranceKey)
     val playedEntrances = entrancesByFilters.getOrPut(entranceKey) { mutableSetOf() }
+    // Pistas desplegadas (con las horas no disponibles a la vista); al cambiar de día o de filtros se pliegan todas
+    val expandedCourts = remember(entranceKey) { mutableStateSetOf<Int>() }
     val pullState = rememberPullToRefreshState()
     // Borde inferior de los filtros dentro de la lista, para colocar ahí el indicador de refresco
     var filtersBottom by remember { mutableIntStateOf(0) }
@@ -247,7 +257,13 @@ private fun BookingContent(
                 is BookingContent.Loaded -> if (content.courts.isEmpty()) {
                     item(key = "empty") { EmptyState(uiState.dayPart, uiState.durationMinutes) }
                 } else {
-                    courtItems(content.courts, uiState.sheet?.selectedSlot, playedEntrances, onSlotClick)
+                    courtItems(
+                        courts = content.courts,
+                        selectedSlot = uiState.sheet?.selectedSlot,
+                        playedEntrances = playedEntrances,
+                        expandedCourts = expandedCourts,
+                        onSlotClick = onSlotClick
+                    )
                 }
 
                 is BookingContent.Schedule ->
@@ -289,6 +305,7 @@ private fun LazyListScope.courtItems(
     courts: List<CourtSlots>,
     selectedSlot: SelectedSlot?,
     playedEntrances: MutableSet<Int>,
+    expandedCourts: MutableSet<Int>,
     onSlotClick: (courtId: Int, start: Instant) -> Unit
 ) {
     itemsIndexed(courts, key = { _, courtSlots -> courtSlots.court.id }) { index, courtSlots ->
@@ -296,13 +313,18 @@ private fun LazyListScope.courtItems(
         EntranceAnimation(
             delayMillis = index * 50L,
             animate = animate,
-            modifier = Modifier
-                .padding(horizontal = 16.dp, vertical = 5.dp)
-                // Sin fundido de salida: las tarjetas que se iban se seguían dibujando en su posición antigua y, si la
-                // lista saltaba, aparecían por encima del título. Las que se quedan sí se recolocan con animación.
-                .animateItem(fadeInSpec = null, placementSpec = spring(), fadeOutSpec = null)
+            // Sin animateItem: con la recolocación animada, al desplegar una tarjeta las de debajo iban por detrás de su
+            // crecimiento y se montaban encima; y el fundido de salida dibujaba las que se iban por encima del título.
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 5.dp)
         ) {
-            CourtCard(courtSlots, selectedSlot, onSlotClick)
+            val courtId = courtSlots.court.id
+            CourtCard(
+                courtSlots = courtSlots,
+                selectedSlot = selectedSlot,
+                expanded = courtId in expandedCourts,
+                onExpandToggle = { if (!expandedCourts.remove(courtId)) expandedCourts.add(courtId) },
+                onSlotClick = onSlotClick
+            )
         }
     }
 }
@@ -458,48 +480,104 @@ private fun DayChip(day: LocalDate, isToday: Boolean, selected: Boolean, locked:
     }
 }
 
+/**
+ * Plegada solo enseña las horas que se pueden reservar (y las propias); al tocarla se despliega con todas, también las
+ * no disponibles, en su orden.
+ */
 @Composable
 private fun CourtCard(
     courtSlots: CourtSlots,
     selectedSlot: SelectedSlot?,
+    expanded: Boolean,
+    onExpandToggle: () -> Unit,
     onSlotClick: (courtId: Int, start: Instant) -> Unit
 ) {
     val court = courtSlots.court
-    CourtCardSurface {
-        CourtHeader(court = court, freeSlots = courtSlots.slots.count { it.state == SlotState.Free })
-        // Cuadrícula de 3 columnas sin scroll propio: va dentro de la lista
-        courtSlots.slots.chunked(SLOT_COLUMNS).forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                row.forEach { slot ->
-                    SlotChip(
-                        slot = slot,
-                        selected = selectedSlot == SelectedSlot(court.id, slot.start),
-                        onClick = { onSlotClick(court.id, slot.start) },
-                        modifier = Modifier.weight(1f)
-                    )
+    val freeSlots = courtSlots.slots.count { it.state == SlotState.Free }
+    val slots = if (expanded) courtSlots.slots else courtSlots.slots.filter { it.state != SlotState.Unavailable }
+    val toggleLabel = stringResource(if (expanded) R.string.booking_court_collapse else R.string.booking_court_expand)
+    CourtCardSurface(clickModifier = Modifier.clickable(onClickLabel = toggleLabel, onClick = onExpandToggle)) {
+        CourtHeader(court = court, freeSlots = freeSlots, expanded = expanded)
+        SlotGrid(slots) { slot, modifier ->
+            SlotChip(
+                slot = slot,
+                selected = selectedSlot == SelectedSlot(court.id, slot.start),
+                onClick = { onSlotClick(court.id, slot.start) },
+                modifier = modifier
+            )
+        }
+    }
+}
+
+/**
+ * Cuadrícula de 3 columnas sin scroll propio (va dentro de la lista). Todas las horas en un solo contenedor y con su
+ * hora como clave: al desplegar o plegar, las que se quedan se deslizan a su nuevo sitio y las que llegan aparecen con
+ * un fundido.
+ */
+@Composable
+private fun SlotGrid(slots: List<Slot>, chip: @Composable (Slot, Modifier) -> Unit) {
+    BoxWithConstraints {
+        val gap = 6.dp
+        // En píxeles enteros y redondeando hacia abajo: con decimales, las 3 podían pasarse un píxel y la tercera
+        // bajaba a la fila siguiente
+        val chipWidth = with(LocalDensity.current) {
+            ((constraints.maxWidth - gap.roundToPx() * (SLOT_COLUMNS - 1)) / SLOT_COLUMNS).toDp()
+        }
+        LookaheadScope {
+            FlowRow(
+                maxItemsInEachRow = SLOT_COLUMNS,
+                horizontalArrangement = Arrangement.spacedBy(gap),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                slots.forEach { slot ->
+                    key(slot.start) {
+                        val alpha = remember { Animatable(0f) }
+                        LaunchedEffect(Unit) { alpha.animateTo(1f) }
+                        chip(
+                            slot,
+                            Modifier
+                                .animateBounds(this@LookaheadScope)
+                                .width(chipWidth)
+                                .graphicsLayer { this.alpha = alpha.value }
+                        )
+                    }
                 }
-                repeat(SLOT_COLUMNS - row.size) { Spacer(Modifier.weight(1f)) }
             }
         }
     }
 }
 
 @Composable
-private fun CourtCardSurface(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+private fun CourtCardSurface(
+    modifier: Modifier = Modifier,
+    // Va dentro del recorte de la forma, para que la onda del toque no se salga de las esquinas
+    clickModifier: Modifier = Modifier,
+    content: @Composable () -> Unit
+) {
+    val shape = RoundedCornerShape(24.dp)
     Surface(
-        shape = RoundedCornerShape(24.dp),
+        shape = shape,
         color = MaterialTheme.colorScheme.surfaceContainerLowest,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        modifier = modifier.fillMaxWidth()
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .then(clickModifier)
     ) {
-        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(
+            modifier = Modifier
+                .animateContentSize()
+                .padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
             content()
         }
     }
 }
 
 @Composable
-private fun CourtHeader(court: Court, freeSlots: Int) {
+private fun CourtHeader(court: Court, freeSlots: Int, expanded: Boolean) {
+    val arrowRotation by animateFloatAsState(if (expanded) 180f else 0f, label = "courtArrow")
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(
             painter = painterResource(
@@ -542,6 +620,15 @@ private fun CourtHeader(court: Court, freeSlots: Int) {
         }
         Spacer(Modifier.width(8.dp))
         if (freeSlots > 0) FreeSlotsTag(freeSlots)
+        Spacer(Modifier.width(4.dp))
+        Icon(
+            painter = painterResource(R.drawable.ic_expand_more),
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier
+                .size(20.dp)
+                .graphicsLayer { rotationZ = arrowRotation }
+        )
     }
 }
 

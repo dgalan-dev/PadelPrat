@@ -23,6 +23,8 @@
     <string name="booking_morning">Mañana</string>
     <string name="booking_afternoon">Tarde</string>
     <string name="booking_covered">Cubierta</string>
+    <string name="booking_court_expand">Ver todas las horas</string>
+    <string name="booking_court_collapse">Ver solo las libres</string>
     <string name="booking_uncovered">Descubierta</string>
     <string name="booking_slot_free">%1$s, libre</string>
     <string name="booking_slot_unavailable">%1$s, no disponible</string>
