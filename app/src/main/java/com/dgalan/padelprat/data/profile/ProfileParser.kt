@@ -25,10 +25,13 @@ object ProfileParser {
         return Profile(
             name = name,
             email = values["email"],
-            phone = values["teléfono"],
+            phone = values["teléfono"]?.replace(SPAIN_PREFIX, ""),
             address = values["dirección"],
             postalCode = values["cod. postal"],
             city = values["población, ciudad"]
         )
     }
+
+    /** El prefijo de España sobra: todos los socios son de aquí. Los de otros países se dejan como vienen. */
+    private val SPAIN_PREFIX = Regex("""^(\+|00)34\s*""")
 }
