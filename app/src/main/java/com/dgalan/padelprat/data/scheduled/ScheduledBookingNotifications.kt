@@ -42,7 +42,7 @@ class ScheduledBookingNotifications @Inject constructor(@ApplicationContext priv
     /** "Esperando a que abra el sábado 31…", mientras el servicio espera la apertura y reserva. */
     fun running(booking: ScheduledBooking?, dryRun: Boolean): Notification =
         NotificationCompat.Builder(context, CHANNEL_RUNNING)
-            .setSmallIcon(R.drawable.ic_schedule)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(
                 context.getString(
                     if (dryRun) R.string.notification_running_test_title else R.string.notification_running_title
@@ -84,7 +84,7 @@ class ScheduledBookingNotifications @Inject constructor(@ApplicationContext priv
             "\n" + context.getString(R.string.notification_clock_warning, abs(it.seconds))
         }.orEmpty()
         val notification = NotificationCompat.Builder(context, CHANNEL_RESULT)
-            .setSmallIcon(R.drawable.ic_schedule)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title)
             .setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(text + clockWarning))
