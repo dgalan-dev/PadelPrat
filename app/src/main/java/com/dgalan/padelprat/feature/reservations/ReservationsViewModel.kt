@@ -9,8 +9,10 @@ import com.dgalan.padelprat.data.reservations.ReservationsChangeNotifier
 import com.dgalan.padelprat.data.reservations.ReservationsRepository
 import com.dgalan.padelprat.data.reservations.ReservationsResult
 import com.dgalan.padelprat.data.scheduled.ScheduledBooking
+import com.dgalan.padelprat.data.scheduled.ScheduledBookingAlarms
 import com.dgalan.padelprat.data.scheduled.ScheduledBookingRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import java.time.Instant
 import javax.inject.Inject
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -34,7 +36,9 @@ sealed interface ReservationsContent {
 }
 
 /** Resultado de anular o de cancelar una programación, que se muestra en un aviso. */
-enum class CancelMessage { Cancelled, NotCancelled, Uncertain, ScheduleCancelled }
+enum class CancelMessage { Cancelled, NotCancelled, Uncertain, ScheduleCancelled, ScheduleTestQueued }
+
+private const val TEST_DELAY_SECONDS = 15L
 
 /** Diálogo de confirmación de anular. Mientras [inProgress], no se puede cerrar. */
 data class CancelDialog(val reservation: Reservation, val inProgress: Boolean = false)
@@ -52,7 +56,8 @@ data class ReservationsUiState(
 class ReservationsViewModel @Inject constructor(
     private val repository: ReservationsRepository,
     changeNotifier: ReservationsChangeNotifier,
-    private val scheduledRepository: ScheduledBookingRepository
+    private val scheduledRepository: ScheduledBookingRepository,
+    private val scheduledAlarms: ScheduledBookingAlarms
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ReservationsUiState())
@@ -121,6 +126,16 @@ class ReservationsViewModel @Inject constructor(
             scheduledRepository.remove(id)
             _uiState.update { it.copy(message = CancelMessage.ScheduleCancelled) }
         }
+    }
+
+    /**
+     * Solo en debug: lanza la programación en unos segundos en modo de prueba (con el día abierto de la semana
+     * anterior y sin llegar a reservar), para probar la alarma, el servicio y la notificación.
+     */
+    fun onScheduleTest(id: String) {
+        val booking = _uiState.value.scheduled.firstOrNull { it.id == id } ?: return
+        scheduledAlarms.scheduleDryRun(booking, Instant.now().plusSeconds(TEST_DELAY_SECONDS))
+        _uiState.update { it.copy(message = CancelMessage.ScheduleTestQueued) }
     }
 
     fun onMessageShow() {

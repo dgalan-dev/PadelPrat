@@ -60,9 +60,12 @@ Decisiones tomadas al final.
 1. **Programar y ver** — hecha (23/10/2026): días cerrados en Reservar hasta 14 días, formulario (horas sacadas de
    la parrilla del mismo día de la semana anterior, hasta 3 pistas por orden), programadas en Próximas y
    cancelarlas. Se guardan en DataStore como JSON. Todavía no se ejecutan.
-2. **El motor** — pendiente: alarma, servicio, sincronización con el reloj del club, espera a la apertura, reserva
-   con las 3 pistas por orden y notificación. Con un modo de prueba solo en debug que llega hasta justo antes de
-   la pre-reserva.
+2. **El motor** — hecha (23/10/2026): `ScheduledBookingAlarms` (`setAlarmClock` a las 8:58), `ScheduledBookingReceiver`,
+   `ScheduledBookingService` (primer plano `dataSync` + wake lock de 6 min como máximo), `ScheduledBookingRunner`
+   (sesión, límite, desfase del reloj, espera a las 9:00 del club, consulta cada segundo 2 min, reserva por orden de
+   pistas) y `ScheduledBookingNotifications`. Probado en el móvil con el modo de prueba de debug ("Probar ahora" en
+   la tarjeta programada: usa el día de la semana anterior y para antes de la pre-reserva): alarma exacta
+   registrada, servicio, salto a la siguiente pista y notificaciones. **Falta la primera reserva real a las 9:00.**
 3. **Permisos y robustez** — pendiente: notificaciones, batería, reprogramar al reiniciar y qué hacer si el
    móvil estaba apagado a la hora de apertura.
 

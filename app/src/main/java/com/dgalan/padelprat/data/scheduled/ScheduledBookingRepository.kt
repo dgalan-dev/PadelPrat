@@ -22,7 +22,10 @@ import kotlinx.serialization.json.Json
  * pistas), así que no se cifran.
  */
 @Singleton
-class ScheduledBookingRepository @Inject constructor(@ApplicationContext context: Context) {
+class ScheduledBookingRepository @Inject constructor(
+    @ApplicationContext context: Context,
+    private val alarms: ScheduledBookingAlarms
+) {
 
     private val dataStore: DataStore<List<ScheduledBooking>> = DataStoreFactory.create(
         serializer = ScheduledBookingsSerializer,
@@ -32,12 +35,16 @@ class ScheduledBookingRepository @Inject constructor(@ApplicationContext context
     /** Ordenadas por cuándo se intentarán. */
     val scheduled: Flow<List<ScheduledBooking>> = dataStore.data
 
+    /** Guarda la programación y pone su alarma a la hora de apertura del día. */
     suspend fun add(booking: ScheduledBooking) {
         dataStore.updateData { current -> (current + booking).sortedWith(compareBy({ it.date }, { it.start })) }
+        alarms.schedule(booking)
     }
 
+    /** Quita la programación y su alarma. */
     suspend fun remove(id: String) {
         dataStore.updateData { current -> current.filterNot { it.id == id } }
+        alarms.cancel(id)
     }
 
     suspend fun all(): List<ScheduledBooking> = dataStore.data.first()

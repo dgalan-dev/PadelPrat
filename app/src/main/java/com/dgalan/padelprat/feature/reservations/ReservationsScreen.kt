@@ -63,6 +63,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.dgalan.padelprat.BuildConfig
 import com.dgalan.padelprat.R
 import com.dgalan.padelprat.core.network.Syltek
 import com.dgalan.padelprat.data.reservations.Reservation
@@ -88,6 +89,7 @@ fun ReservationsScreen(modifier: Modifier = Modifier, viewModel: ReservationsVie
         onTabSelect = viewModel::onTabSelect,
         onCancelClick = viewModel::onCancelClick,
         onScheduleCancel = viewModel::onScheduleCancel,
+        onScheduleTest = viewModel::onScheduleTest,
         onRefresh = viewModel::onRefresh,
         onRetry = viewModel::onRetry,
         onMessageShow = viewModel::onMessageShow,
@@ -111,6 +113,7 @@ private fun ReservationsContent(
     onTabSelect: (ReservationsTab) -> Unit,
     onCancelClick: (Reservation) -> Unit,
     onScheduleCancel: (String) -> Unit,
+    onScheduleTest: (String) -> Unit,
     onRefresh: () -> Unit,
     onRetry: () -> Unit,
     onMessageShow: () -> Unit,
@@ -163,7 +166,14 @@ private fun ReservationsContent(
                     )
 
                     is ReservationsContent.Loaded ->
-                        ReservationList(uiState.tab, content, uiState.scheduled, onCancelClick, onScheduleCancel)
+                        ReservationList(
+                            tab = uiState.tab,
+                            content = content,
+                            scheduled = uiState.scheduled,
+                            onCancelClick = onCancelClick,
+                            onScheduleCancel = onScheduleCancel,
+                            onScheduleTest = onScheduleTest
+                        )
                 }
             }
         }
@@ -182,7 +192,8 @@ private fun ReservationList(
     content: ReservationsContent.Loaded,
     scheduled: List<ScheduledBooking>,
     onCancelClick: (Reservation) -> Unit,
-    onScheduleCancel: (String) -> Unit
+    onScheduleCancel: (String) -> Unit,
+    onScheduleTest: (String) -> Unit
 ) {
     val reservations = when (tab) {
         ReservationsTab.Upcoming -> content.upcoming
@@ -201,7 +212,11 @@ private fun ReservationList(
         modifier = Modifier.fillMaxSize()
     ) {
         items(shownScheduled, key = { "scheduled-${it.id}" }) { booking ->
-            ScheduledCard(booking, onCancelClick = { onScheduleCancel(booking.id) })
+            ScheduledCard(
+                booking = booking,
+                onCancelClick = { onScheduleCancel(booking.id) },
+                onTestClick = { onScheduleTest(booking.id) }
+            )
         }
         itemsIndexed(reservations, key = { _, reservation -> reservation.id }) { index, reservation ->
             when (tab) {
@@ -256,7 +271,7 @@ private fun UpcomingCard(reservation: Reservation, highlighted: Boolean, onCance
  * etiqueta "Programada" (no lima).
  */
 @Composable
-private fun ScheduledCard(booking: ScheduledBooking, onCancelClick: () -> Unit) {
+private fun ScheduledCard(booking: ScheduledBooking, onCancelClick: () -> Unit, onTestClick: () -> Unit) {
     val scheme = MaterialTheme.colorScheme
     val dashColor = scheme.outline
     Column(
@@ -310,8 +325,16 @@ private fun ScheduledCard(booking: ScheduledBooking, onCancelClick: () -> Unit) 
             style = MaterialTheme.typography.bodySmall,
             color = scheme.onSurfaceVariant
         )
-        TextButton(onClick = onCancelClick, modifier = Modifier.padding(top = 2.dp)) {
-            Text(stringResource(R.string.reservations_scheduled_cancel))
+        Row {
+            TextButton(onClick = onCancelClick, modifier = Modifier.padding(top = 2.dp)) {
+                Text(stringResource(R.string.reservations_scheduled_cancel))
+            }
+            // Solo en debug: prueba de todo el camino sin reservar (ver ReservationsViewModel.onScheduleTest)
+            if (BuildConfig.DEBUG) {
+                TextButton(onClick = onTestClick, modifier = Modifier.padding(top = 2.dp)) {
+                    Text(stringResource(R.string.reservations_scheduled_test))
+                }
+            }
         }
     }
 }
@@ -594,6 +617,7 @@ private fun CancelMessage.textRes(): Int = when (this) {
     CancelMessage.NotCancelled -> R.string.reservations_cancel_not_done
     CancelMessage.Uncertain -> R.string.reservations_cancel_uncertain
     CancelMessage.ScheduleCancelled -> R.string.reservations_scheduled_cancelled
+    CancelMessage.ScheduleTestQueued -> R.string.reservations_scheduled_test_queued
 }
 
 @Preview(showBackground = true)
@@ -622,6 +646,7 @@ private fun ReservationsContentPreview() {
             onTabSelect = {},
             onCancelClick = {},
             onScheduleCancel = {},
+            onScheduleTest = {},
             onRefresh = {},
             onRetry = {},
             onMessageShow = {}

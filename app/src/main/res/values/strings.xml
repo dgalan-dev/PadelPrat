@@ -46,6 +46,27 @@
     <!-- "Pista 2, preferencia 1" -->
     <string name="schedule_court_position">%1$s, preferencia %2$d</string>
     <string name="schedule_save">Programar reserva</string>
+    <string name="notification_channel_running">Reserva programada en curso</string>
+    <string name="notification_channel_result">Resultado de las reservas programadas</string>
+    <string name="notification_running_title">Reserva programada</string>
+    <string name="notification_running_test_title">Prueba de reserva programada</string>
+    <!-- "Esperando a que abra el sábado 31 de octubre…" -->
+    <string name="notification_running_text">Esperando a que abra el %1$s…</string>
+    <string name="notification_result_booked_title">¡Pista reservada!</string>
+    <!-- "Pista 2, el sábado 31 de octubre a las 18:30" -->
+    <string name="notification_result_booked_text">%1$s, el %2$s a las %3$s.</string>
+    <string name="notification_result_test_title">Prueba completada (sin reservar)</string>
+    <string name="notification_result_test_text">Se habría reservado la %1$s a las %2$s. No se ha hecho ninguna reserva.</string>
+    <string name="notification_result_failed_title">No se ha podido reservar</string>
+    <string name="notification_result_no_court">Ninguna de las pistas elegidas estaba libre el %1$s a las %2$s.</string>
+    <string name="notification_result_limit">Ya tenías el máximo de reservas del club para el %1$s a las %2$s. Anula una para poder reservar.</string>
+    <string name="notification_result_logged_out">La sesión se había cerrado; no se ha podido reservar el %1$s a las %2$s. Vuelve a entrar en la app.</string>
+    <string name="notification_result_not_opened">El club no abrió el %1$s a la hora prevista; no se ha reservado a las %2$s.</string>
+    <string name="notification_result_failed">Falló la conexión o la web respondió algo inesperado al reservar el %1$s a las %2$s.</string>
+    <string name="notification_result_uncertain_title">Comprueba la reserva</string>
+    <string name="notification_result_uncertain_text">No se sabe si la reserva del %1$s a las %2$s se ha completado. Revísalo en Mis reservas.</string>
+    <!-- Se añade al resultado si el reloj del móvil estaba desajustado -->
+    <string name="notification_clock_warning">El reloj del móvil iba %1$d s desajustado; revisa que "Fecha y hora automáticas" esté activado.</string>
     <string name="schedule_saved">Programada. Se intentará reservar el %1$s.</string>
     <plurals name="booking_free_slots">
         <item quantity="one">%d libre</item>
@@ -92,6 +113,8 @@
     <string name="reservations_scheduled_when">Se intentará reservar el %1$s</string>
     <string name="reservations_scheduled_cancel">Cancelar programación</string>
     <string name="reservations_scheduled_cancelled">Programación cancelada</string>
+    <string name="reservations_scheduled_test">Probar ahora</string>
+    <string name="reservations_scheduled_test_queued">Prueba en 15 s (sin reservar). Mira la notificación.</string>
     <string name="reservations_cancel">Anular</string>
     <string name="reservations_cancel_title">¿Anular la reserva?</string>
     <!-- "Lunes, 26 de octubre · 17:30 – 19:00" -->
