@@ -33,6 +33,8 @@ class ScheduledBookingService : Service() {
 
     @Inject lateinit var changeNotifier: ReservationsChangeNotifier
 
+    @Inject lateinit var registry: ScheduledRunRegistry
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var running = 0
     private var wakeLock: PowerManager.WakeLock? = null
@@ -53,6 +55,11 @@ class ScheduledBookingService : Service() {
             stopIfIdle()
             return START_NOT_STICKY
         }
+        // Si esta programación ya se está ejecutando (p. ej. la alarma y la app la lanzan a la vez), no se repite
+        if (!registry.tryStart(bookingId)) {
+            stopIfIdle()
+            return START_NOT_STICKY
+        }
         acquireWakeLock()
         running++
         scope.launch {
@@ -63,7 +70,7 @@ class ScheduledBookingService : Service() {
                         ScheduledBookingNotifications.RUNNING_NOTIFICATION_ID,
                         notifications.running(booking, dryRun)
                     )
-                val run = runner.run(booking, dryRun)
+                val run = runner.run(booking, dryRun, onBookingStart = { repository.markBookingStarted(booking.id) })
                 notifications.showResult(booking, run)
                 // La programación ya se ha intentado: se quita (en modo de prueba se deja para poder repetirla)
                 if (!dryRun) {
@@ -71,6 +78,7 @@ class ScheduledBookingService : Service() {
                     changeNotifier.notifyChanged()
                 }
             } finally {
+                registry.finish(bookingId)
                 running--
                 stopIfIdle()
             }

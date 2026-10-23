@@ -77,6 +77,8 @@ class ScheduledBookingNotifications @Inject constructor(@ApplicationContext priv
                 context.getString(R.string.notification_result_uncertain_text, day, time)
 
             ScheduledRunResult.Failed -> failed(R.string.notification_result_failed, day, time)
+
+            ScheduledRunResult.Missed -> failed(R.string.notification_result_missed, day, time)
         }
         val clockWarning = run.clockOffset?.let {
             "\n" + context.getString(R.string.notification_clock_warning, abs(it.seconds))

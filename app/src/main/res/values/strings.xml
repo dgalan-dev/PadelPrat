@@ -46,6 +46,12 @@
     <!-- "Pista 2, preferencia 1" -->
     <string name="schedule_court_position">%1$s, preferencia %2$d</string>
     <string name="schedule_save">Programar reserva</string>
+    <string name="battery_dialog_title">Para las reservas programadas</string>
+    <string name="battery_dialog_text">Para que una reserva programada se haga a las 9:00 aunque no uses el móvil, la app no debe tener restricciones de batería. No gasta más: solo evita que el sistema la duerma y bloquee la alarma.</string>
+    <string name="battery_dialog_allow">Quitar restricción</string>
+    <string name="battery_dialog_later">Ahora no</string>
+    <string name="schedule_battery_warning">La app tiene restricciones de batería y la reserva programada podría no hacerse a su hora.</string>
+    <string name="schedule_battery_fix">Quitar restricción</string>
     <string name="notification_channel_running">Reserva programada en curso</string>
     <string name="notification_channel_result">Resultado de las reservas programadas</string>
     <string name="notification_running_title">Reserva programada</string>
@@ -63,6 +69,7 @@
     <string name="notification_result_logged_out">La sesión se había cerrado; no se ha podido reservar el %1$s a las %2$s. Vuelve a entrar en la app.</string>
     <string name="notification_result_not_opened">El club no abrió el %1$s a la hora prevista; no se ha reservado a las %2$s.</string>
     <string name="notification_result_failed">Falló la conexión o la web respondió algo inesperado al reservar el %1$s a las %2$s.</string>
+    <string name="notification_result_missed">El móvil estaba apagado o sin conexión cuando se abrió el día, y la reserva del %1$s a las %2$s ya ha pasado.</string>
     <string name="notification_result_uncertain_title">Comprueba la reserva</string>
     <string name="notification_result_uncertain_text">No se sabe si la reserva del %1$s a las %2$s se ha completado. Revísalo en Mis reservas.</string>
     <!-- Se añade al resultado si el reloj del móvil estaba desajustado -->

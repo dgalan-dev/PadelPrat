@@ -39,6 +39,9 @@ sealed interface ScheduledRunResult {
     /** Se cortó al confirmar o la web pidió un paso más: hay que comprobarlo en Mis reservas. */
     data object Uncertain : ScheduledRunResult
 
+    /** No se pudo intentar a tiempo (el móvil estaba apagado) y el partido ya ha empezado. */
+    data object Missed : ScheduledRunResult
+
     /** Sin conexión o la web respondió algo inesperado. */
     data object Failed : ScheduledRunResult
 }
@@ -67,7 +70,7 @@ class ScheduledBookingRunner @Inject constructor(
     private val reservationRepository: ReservationRepository
 ) {
 
-    suspend fun run(booking: ScheduledBooking, dryRun: Boolean): ScheduledRun {
+    suspend fun run(booking: ScheduledBooking, dryRun: Boolean, onBookingStart: suspend () -> Unit = {}): ScheduledRun {
         if (!authRepository.isLoggedIn.first()) return ScheduledRun(ScheduledRunResult.LoggedOut, null)
 
         reservationsRepository.refreshActiveCount()
@@ -96,6 +99,8 @@ class ScheduledBookingRunner @Inject constructor(
             val slot = slots.firstOrNull { it.court.id == court.id }?.slots?.firstOrNull { it.start == slotStart }
             if (slot?.state != SlotState.Free) continue
             if (dryRun) return ScheduledRun(ScheduledRunResult.Booked(court, dryRun = true), warning)
+            // A partir de aquí puede quedar hecha una reserva: se apunta por si el servicio muere a medias
+            onBookingStart()
 
             when (reservationRepository.book(court.id, start, booking.durationMinutes)) {
                 is ReservationResult.Success -> return ScheduledRun(ScheduledRunResult.Booked(court, false), warning)

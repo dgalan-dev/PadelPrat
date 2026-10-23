@@ -15,6 +15,8 @@ import javax.inject.Singleton
  * en reposo profundo y saca al móvil del modo Doze, así que a la hora de apertura hay red y CPU. Como efecto
  * secundario, Android muestra el icono de alarma mientras haya una programada.
  */
+private const val SOON_SECONDS = 5L
+
 @Singleton
 class ScheduledBookingAlarms @Inject constructor(@ApplicationContext private val context: Context) {
 
@@ -24,6 +26,11 @@ class ScheduledBookingAlarms @Inject constructor(@ApplicationContext private val
     fun schedule(booking: ScheduledBooking) {
         val triggerAt = booking.opensAt.minus(ScheduledBookingRunner.WAKE_UP_BEFORE)
         scheduleAt(booking.id, triggerAt, dryRun = false)
+    }
+
+    /** El día ya está abierto (p. ej. el móvil estaba apagado a las 9:00): se intenta en unos segundos. */
+    fun scheduleSoon(booking: ScheduledBooking) {
+        scheduleAt(booking.id, Instant.now().plusSeconds(SOON_SECONDS), dryRun = false)
     }
 
     /** Modo de prueba (solo debug): lanza la programación al momento indicado, sin reservar nada. */

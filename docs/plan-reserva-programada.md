@@ -66,8 +66,18 @@ Decisiones tomadas al final.
    pistas) y `ScheduledBookingNotifications`. Probado en el móvil con el modo de prueba de debug ("Probar ahora" en
    la tarjeta programada: usa el día de la semana anterior y para antes de la pre-reserva): alarma exacta
    registrada, servicio, salto a la siguiente pista y notificaciones. **Falta la primera reserva real a las 9:00.**
-3. **Permisos y robustez** — pendiente: notificaciones, batería, reprogramar al reiniciar y qué hacer si el
-   móvil estaba apagado a la hora de apertura.
+3. **Permisos y robustez** — hecha (23/10/2026):
+   - Al entrar en la pantalla principal se piden las notificaciones y, una sola vez, quitar la optimización de
+     batería (`StartupPermissions`, `BatteryOptimization`). Si sigue restringida, el formulario de programar muestra
+     un aviso con "Quitar restricción", que se vuelve a comprobar al volver a la app.
+   - `ScheduledBookingRescheduler.reconcile()` repasa las programaciones al abrir la app (`MainViewModel`) y en
+     `RescheduleReceiver` (reinicio, actualización de la app, cambio de hora o de zona y permiso de alarmas exactas):
+     - antes de las 8:58 del día de apertura: vuelve a poner la alarma;
+     - pasada la apertura pero antes del partido (el móvil estaba apagado o la app detenida): lo intenta en 5 s;
+     - con el partido ya empezado: la quita y avisa de que no se pudo intentar (`Missed`);
+     - si el servicio murió con la reserva a medias (`bookingStarted`): la quita y avisa de comprobarlo en Mis
+       reservas (`Uncertain`), sin reintentar para no reservar dos veces.
+   - `ScheduledRunRegistry` evita que la alarma y `reconcile` lancen la misma programación a la vez.
 
 ## Decisiones tomadas (23/10/2026)
 

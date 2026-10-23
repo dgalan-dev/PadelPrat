@@ -49,6 +49,10 @@ class ScheduledBookingRepository @Inject constructor(
 
     suspend fun all(): List<ScheduledBooking> = dataStore.data.first()
 
+    suspend fun markBookingStarted(id: String) {
+        dataStore.updateData { current -> current.map { if (it.id == id) it.copy(bookingStarted = true) else it } }
+    }
+
     fun newId(): String = UUID.randomUUID().toString()
 
     private companion object {

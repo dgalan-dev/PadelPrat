@@ -22,9 +22,15 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -34,8 +40,10 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.dgalan.padelprat.R
 import com.dgalan.padelprat.core.network.Syltek
+import com.dgalan.padelprat.core.system.BatteryOptimization
 import com.dgalan.padelprat.data.booking.Court
 import com.dgalan.padelprat.data.scheduled.MAX_SCHEDULED_COURTS
 import java.time.Instant
@@ -51,6 +59,7 @@ fun LazyListScope.scheduleItems(
     onSave: () -> Unit
 ) {
     item(key = "schedule-info") { OpensInfo(form.opensAt, Modifier.padding(horizontal = 16.dp, vertical = 5.dp)) }
+    item(key = "schedule-battery") { BatteryWarning(Modifier.padding(horizontal = 16.dp, vertical = 5.dp)) }
     item(key = "schedule-times") {
         Section(title = stringResource(R.string.schedule_time_title)) {
             if (form.times.isEmpty()) {
@@ -127,6 +136,41 @@ private fun OpensInfo(opensAt: Instant, modifier: Modifier = Modifier) {
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSecondaryContainer
             )
+        }
+    }
+}
+
+/**
+ * Aviso si la app tiene restricciones de batería, con un botón para quitarlas. Se comprueba al volver a la app, así
+ * que desaparece en cuanto se quitan.
+ */
+@Composable
+private fun BatteryWarning(modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    var restricted by remember { mutableStateOf(BatteryOptimization.isRestricted(context)) }
+    LifecycleResumeEffect(Unit) {
+        restricted = BatteryOptimization.isRestricted(context)
+        onPauseOrDispose {}
+    }
+    if (!restricted) return
+
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.errorContainer,
+        modifier = modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 4.dp)) {
+            Text(
+                text = stringResource(R.string.schedule_battery_warning),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onErrorContainer
+            )
+            TextButton(
+                onClick = { context.startActivity(BatteryOptimization.requestIntent(context)) },
+                modifier = Modifier.align(Alignment.End)
+            ) {
+                Text(stringResource(R.string.schedule_battery_fix), color = MaterialTheme.colorScheme.onErrorContainer)
+            }
         }
     }
 }

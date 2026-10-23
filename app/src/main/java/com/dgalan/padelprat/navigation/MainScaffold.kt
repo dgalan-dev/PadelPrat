@@ -1,11 +1,6 @@
 package com.dgalan.padelprat.navigation
 
-import android.Manifest
-import android.content.pm.PackageManager
-import android.os.Build
 import androidx.activity.compose.BackHandler
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
@@ -30,11 +25,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.core.content.ContextCompat
 import com.dgalan.padelprat.feature.booking.BookingScreen
 import com.dgalan.padelprat.feature.profile.ProfileScreen
 import com.dgalan.padelprat.feature.reservations.ReservationsScreen
@@ -51,7 +44,7 @@ fun MainScaffold(modifier: Modifier = Modifier) {
     var selected by rememberSaveable { mutableStateOf(TopLevelDestination.entries.first()) }
     val stateHolder = rememberSaveableStateHolder()
     val haptics = LocalHapticFeedback.current
-    RequestNotificationPermission()
+    StartupPermissions()
 
     BackHandler(enabled = selected != TopLevelDestination.entries.first()) {
         selected = TopLevelDestination.entries.first()
@@ -101,22 +94,6 @@ fun MainScaffold(modifier: Modifier = Modifier) {
                 }
             }
         }
-    }
-}
-
-/**
- * Android 13+: pide permiso para las notificaciones (el resultado de las reservas programadas) la primera vez que se
- * entra en la pantalla principal. Si se deniega, la app funciona igual; solo no se verán esos avisos.
- */
-@Composable
-private fun RequestNotificationPermission() {
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
-    val context = LocalContext.current
-    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
-    LaunchedEffect(Unit) {
-        val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
-            PackageManager.PERMISSION_GRANTED
-        if (!granted) launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
 }
 
