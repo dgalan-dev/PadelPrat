@@ -8,6 +8,8 @@ import com.dgalan.padelprat.data.reservations.ReservationStatus
 import com.dgalan.padelprat.data.reservations.ReservationsChangeNotifier
 import com.dgalan.padelprat.data.reservations.ReservationsRepository
 import com.dgalan.padelprat.data.reservations.ReservationsResult
+import com.dgalan.padelprat.data.scheduled.ScheduledBooking
+import com.dgalan.padelprat.data.scheduled.ScheduledBookingRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.Job
@@ -31,8 +33,8 @@ sealed interface ReservationsContent {
         ReservationsContent
 }
 
-/** Resultado de anular, que se muestra en un aviso. */
-enum class CancelMessage { Cancelled, NotCancelled, Uncertain }
+/** Resultado de anular o de cancelar una programación, que se muestra en un aviso. */
+enum class CancelMessage { Cancelled, NotCancelled, Uncertain, ScheduleCancelled }
 
 /** Diálogo de confirmación de anular. Mientras [inProgress], no se puede cerrar. */
 data class CancelDialog(val reservation: Reservation, val inProgress: Boolean = false)
@@ -41,13 +43,16 @@ data class ReservationsUiState(
     val tab: ReservationsTab = ReservationsTab.Upcoming,
     val content: ReservationsContent = ReservationsContent.Loading,
     val cancelDialog: CancelDialog? = null,
-    val message: CancelMessage? = null
+    val message: CancelMessage? = null,
+    /** Reservas programadas que aún no se han intentado; se muestran arriba de las próximas. */
+    val scheduled: List<ScheduledBooking> = emptyList()
 )
 
 @HiltViewModel
 class ReservationsViewModel @Inject constructor(
     private val repository: ReservationsRepository,
-    changeNotifier: ReservationsChangeNotifier
+    changeNotifier: ReservationsChangeNotifier,
+    private val scheduledRepository: ScheduledBookingRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ReservationsUiState())
@@ -59,6 +64,9 @@ class ReservationsViewModel @Inject constructor(
         load()
         // Al reservar desde la parrilla o al anular aquí, se recarga solo
         viewModelScope.launch { changeNotifier.changes.collect { load() } }
+        viewModelScope.launch {
+            scheduledRepository.scheduled.collect { scheduled -> _uiState.update { it.copy(scheduled = scheduled) } }
+        }
     }
 
     fun onTabSelect(tab: ReservationsTab) {
@@ -104,6 +112,14 @@ class ReservationsViewModel @Inject constructor(
             }
             // El listado se recarga solo con el aviso de cambios del repositorio
             _uiState.update { it.copy(cancelDialog = null, message = message) }
+        }
+    }
+
+    /** Quita la programación: todavía no hay reserva, así que no hay nada que anular en la web. */
+    fun onScheduleCancel(id: String) {
+        viewModelScope.launch {
+            scheduledRepository.remove(id)
+            _uiState.update { it.copy(message = CancelMessage.ScheduleCancelled) }
         }
     }
 

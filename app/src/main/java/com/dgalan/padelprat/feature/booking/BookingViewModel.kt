@@ -18,9 +18,16 @@ import com.dgalan.padelprat.data.booking.TimetableResult
 import com.dgalan.padelprat.data.profile.ProfileRepository
 import com.dgalan.padelprat.data.reservations.ReservationsChangeNotifier
 import com.dgalan.padelprat.data.reservations.ReservationsRepository
+import com.dgalan.padelprat.data.scheduled.MAX_SCHEDULED_COURTS
+import com.dgalan.padelprat.data.scheduled.MAX_SCHEDULE_DAYS_AHEAD
+import com.dgalan.padelprat.data.scheduled.ScheduledBooking
+import com.dgalan.padelprat.data.scheduled.ScheduledBookingRepository
+import com.dgalan.padelprat.data.scheduled.ScheduledCourt
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalTime
+import java.time.ZonedDateTime
 import javax.inject.Inject
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -38,6 +45,15 @@ sealed interface BookingContent {
 
     /** Pistas con algún hueco libre o propio en la franja elegida; vacía si no queda ninguno. */
     data class Loaded(val courts: List<CourtSlots>) : BookingContent
+
+    /** Día aún no abierto en la web: en lugar de la parrilla, el formulario para programar la reserva. */
+    data class Schedule(val form: ScheduleForm) : BookingContent
+}
+
+/** Aviso de un solo uso que se muestra abajo. */
+sealed interface BookingMessage {
+    /** Programada; se intentará reservar en [opensAt]. */
+    data class Scheduled(val opensAt: Instant) : BookingMessage
 }
 
 /** Hueco elegido por el usuario. */
@@ -92,8 +108,13 @@ data class BookingUiState(
     /** Para el saludo; `null` hasta que llegan los datos del perfil. */
     val firstName: String? = null,
     /** Ya tiene el máximo de reservas activas que permite el club: se avisa y no se deja confirmar otra. */
-    val reservationLimitReached: Boolean = false
-)
+    val reservationLimitReached: Boolean = false,
+    /** Último día que ya se puede reservar; los siguientes de [days] solo se pueden programar. */
+    val lastOpenDay: LocalDate,
+    val message: BookingMessage? = null
+) {
+    fun isLocked(day: LocalDate): Boolean = day > lastOpenDay
+}
 
 /** Lo habitual es reservar un partido de hora y media. */
 private const val DEFAULT_DURATION = 90
@@ -104,7 +125,8 @@ class BookingViewModel @Inject constructor(
     private val reservationRepository: ReservationRepository,
     changeNotifier: ReservationsChangeNotifier,
     profileRepository: ProfileRepository,
-    private val reservationsRepository: ReservationsRepository
+    private val reservationsRepository: ReservationsRepository,
+    private val scheduledRepository: ScheduledBookingRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(initialState())
@@ -136,7 +158,7 @@ class BookingViewModel @Inject constructor(
                 // Al reservar o anular cambia también cuántas reservas activas hay
                 launch { reservationsRepository.refreshActiveCount() }
                 timetables.clear()
-                if (_uiState.value.sheet == null) load(_uiState.value.selectedDay)
+                if (_uiState.value.sheet == null) showSelectedDay()
             }
         }
     }
@@ -144,18 +166,105 @@ class BookingViewModel @Inject constructor(
     fun onDaySelect(day: LocalDate) {
         if (day == _uiState.value.selectedDay) return
         _uiState.update { it.copy(selectedDay = day) }
-        val cached = timetables[day]
-        if (cached != null) showTimetable(cached) else load(day)
+        showSelectedDay()
     }
 
     fun onDayPartSelect(dayPart: DayPart) {
         _uiState.update { it.copy(dayPart = dayPart) }
-        timetables[_uiState.value.selectedDay]?.let(::showTimetable)
+        refreshShownDay()
     }
 
     fun onDurationSelect(minutes: Int) {
         _uiState.update { it.copy(durationMinutes = minutes) }
-        timetables[_uiState.value.selectedDay]?.let(::showTimetable)
+        refreshShownDay()
+    }
+
+    /** Día abierto: su parrilla. Día cerrado: el formulario de programar, con la parrilla de una semana antes. */
+    private fun showSelectedDay() {
+        val day = _uiState.value.selectedDay
+        if (_uiState.value.isLocked(day)) {
+            val template = day.minusDays(Syltek.BOOKING_OPENS_DAYS_BEFORE)
+            val cached = timetables[template]
+            if (cached != null) showScheduleForm(day, cached) else load(template, showAs = day)
+        } else {
+            val cached = timetables[day]
+            if (cached != null) showTimetable(cached) else load(day)
+        }
+    }
+
+    /** Tras cambiar franja o duración: se recalcula lo que se ve sin volver a pedirlo. */
+    private fun refreshShownDay() {
+        val state = _uiState.value
+        val day = state.selectedDay
+        if (state.isLocked(day)) {
+            timetables[day.minusDays(Syltek.BOOKING_OPENS_DAYS_BEFORE)]?.let { showScheduleForm(day, it) }
+        } else {
+            timetables[day]?.let(::showTimetable)
+        }
+    }
+
+    fun onScheduleTimeSelect(time: LocalTime) {
+        updateScheduleForm { it.copy(selectedTime = if (it.selectedTime == time) null else time) }
+    }
+
+    /** Añade la pista al final de la lista de preferencia o la quita si ya estaba. */
+    fun onScheduleCourtToggle(courtId: Int) {
+        updateScheduleForm { form ->
+            when {
+                courtId in form.selectedCourts -> form.copy(selectedCourts = form.selectedCourts - courtId)
+
+                form.selectedCourts.size < MAX_SCHEDULED_COURTS -> form.copy(
+                    selectedCourts =
+                        form.selectedCourts + courtId
+                )
+
+                else -> form
+            }
+        }
+    }
+
+    fun onScheduleSave() {
+        val form = (_uiState.value.content as? BookingContent.Schedule)?.form ?: return
+        val time = form.selectedTime ?: return
+        if (!form.canSave) return
+        updateScheduleForm { it.copy(isSaving = true) }
+        viewModelScope.launch {
+            val courts = form.selectedCourts.mapNotNull { id ->
+                form.courts.firstOrNull { it.id == id }?.let { ScheduledCourt(it.id, it.name, it.sponsor) }
+            }
+            val booking = ScheduledBooking(
+                id = scheduledRepository.newId(),
+                date = form.day,
+                start = time,
+                durationMinutes = _uiState.value.durationMinutes,
+                courts = courts
+            )
+            scheduledRepository.add(booking)
+            updateScheduleForm { it.copy(isSaving = false, selectedTime = null, selectedCourts = emptyList()) }
+            _uiState.update { it.copy(message = BookingMessage.Scheduled(booking.opensAt)) }
+        }
+    }
+
+    fun onMessageShow() {
+        _uiState.update { it.copy(message = null) }
+    }
+
+    private fun updateScheduleForm(transform: (ScheduleForm) -> ScheduleForm) {
+        _uiState.update { state ->
+            val content = state.content as? BookingContent.Schedule ?: return@update state
+            state.copy(content = BookingContent.Schedule(transform(content.form)))
+        }
+    }
+
+    private fun showScheduleForm(day: LocalDate, template: DayTimetable) {
+        _uiState.update { state ->
+            if (state.selectedDay != day) return@update state
+            val previous = (state.content as? BookingContent.Schedule)?.form
+            val opensAt = day.minusDays(Syltek.BOOKING_OPENS_DAYS_BEFORE).atTime(Syltek.BOOKING_OPENS_AT)
+                .atZone(Syltek.ZONE).toInstant()
+            val form = ScheduleForm.from(day, opensAt, template, state.dayPart, state.durationMinutes, previous)
+            state.copy(content = BookingContent.Schedule(form))
+        }
     }
 
     fun onSlotClick(courtId: Int, start: Instant) {
@@ -231,14 +340,14 @@ class BookingViewModel @Inject constructor(
     fun onRefresh() {
         val day = _uiState.value.selectedDay
         timetables.remove(day)
-        load(day)
+        timetables.remove(day.minusDays(Syltek.BOOKING_OPENS_DAYS_BEFORE))
+        showSelectedDay()
     }
 
-    fun onRetry() {
-        load(_uiState.value.selectedDay)
-    }
+    fun onRetry() = showSelectedDay()
 
-    private fun load(day: LocalDate) {
+    /** Carga la parrilla de [day]. Si [showAs] es un día cerrado, se usa como plantilla de su formulario. */
+    private fun load(day: LocalDate, showAs: LocalDate = day) {
         loadJob?.cancel()
         _uiState.update { it.copy(content = BookingContent.Loading) }
         loadJob = viewModelScope.launch {
@@ -246,7 +355,7 @@ class BookingViewModel @Inject constructor(
                 is TimetableResult.Success -> {
                     timetables[day] = result.timetable
                     updateDays(result.timetable)
-                    showTimetable(result.timetable)
+                    if (showAs == day) showTimetable(result.timetable) else showScheduleForm(showAs, result.timetable)
                 }
 
                 TimetableResult.NetworkError -> showError(BookingError.Network)
@@ -273,25 +382,39 @@ class BookingViewModel @Inject constructor(
         _uiState.update { it.copy(content = BookingContent.Error(error)) }
     }
 
-    /** Los días que se pueden reservar van de hoy hasta el límite que marca el servidor. */
+    /**
+     * Los días van de hoy hasta [MAX_SCHEDULE_DAYS_AHEAD]: los abiertos (hasta el último que marca el servidor) se
+     * reservan y los siguientes se programan.
+     */
     private fun updateDays(timetable: DayTimetable) {
         val today = timetable.now.atZone(Syltek.ZONE).toLocalDate()
-        val lastDay = timetable.maxAvailability.atZone(Syltek.ZONE).toLocalDate()
-        val days = generateSequence(today) { it.plusDays(1) }.takeWhile { it <= lastDay }.toList()
-        if (days.isNotEmpty()) _uiState.update { it.copy(days = days) }
+        val lastOpenDay = timetable.maxAvailability.atZone(Syltek.ZONE).toLocalDate()
+        _uiState.update { it.copy(days = daysFrom(today), lastOpenDay = lastOpenDay) }
     }
 
     private companion object {
-        /** Antes de la primera respuesta se muestran 8 días, lo habitual (hoy y los 7 siguientes). */
-        const val DEFAULT_DAYS = 8L
+        fun daysFrom(today: LocalDate): List<LocalDate> = (0..MAX_SCHEDULE_DAYS_AHEAD).map(today::plusDays)
 
-        /** Siempre se abre en la tarde, que es cuando más se juega. */
+        /**
+         * Siempre se abre en la tarde, que es cuando más se juega. Hasta la primera respuesta del servidor, el último
+         * día abierto se estima con la regla del club (a partir de las 9:00 se abre el día de dentro de 7 días).
+         */
         fun initialState(): BookingUiState {
-            val today = LocalDate.now(Syltek.ZONE)
+            val now = ZonedDateTime.now(Syltek.ZONE)
+            val today = now.toLocalDate()
+            val opened = !now.toLocalTime().isBefore(Syltek.BOOKING_OPENS_AT)
             return BookingUiState(
-                days = (0 until DEFAULT_DAYS).map(today::plusDays),
+                days = daysFrom(today),
                 selectedDay = today,
-                dayPart = DayPart.Afternoon
+                dayPart = DayPart.Afternoon,
+                lastOpenDay = today.plusDays(
+                    if (opened) {
+                        Syltek.BOOKING_OPENS_DAYS_BEFORE
+                    } else {
+                        Syltek.BOOKING_OPENS_DAYS_BEFORE -
+                            1
+                    }
+                )
             )
         }
     }

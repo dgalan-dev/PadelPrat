@@ -1,4 +1,5 @@
-<resources>
+<!-- Textos en español: tools:locale evita que lint los revise como inglés -->
+<resources xmlns:tools="http://schemas.android.com/tools" tools:locale="es">
     <string name="app_name">Padel Prat</string>
 
     <string name="login_subtitle">Reserva tu pista en segundos</string>
@@ -32,9 +33,24 @@
     <string name="booking_error_network">No hay conexión. Revisa tu internet y vuelve a intentarlo.</string>
     <string name="booking_error_unknown">No se ha podido cargar la disponibilidad. Vuelve a intentarlo más tarde.</string>
     <string name="booking_retry">Reintentar</string>
+    <string name="schedule_day_locked">Todavía no se puede reservar; se puede programar</string>
+    <!-- "Este día todavía no se puede reservar. Se abre el sábado 24 a las 9:00." -->
+    <string name="schedule_opens_info">Este día todavía no se puede reservar. Se abre el %1$s. Prográmalo y la app intentará reservarlo en ese momento.</string>
+    <string name="schedule_time_title">Hora</string>
+    <string name="schedule_no_times">No hay horas en esta franja con esta duración.</string>
+    <plurals name="schedule_courts_title">
+        <item quantity="one">Pista (%d)</item>
+        <item quantity="other">Pistas (hasta %d, por orden de preferencia)</item>
+        <item quantity="many">Pistas (hasta %d, por orden de preferencia)</item>
+    </plurals>
+    <!-- "Pista 2, preferencia 1" -->
+    <string name="schedule_court_position">%1$s, preferencia %2$d</string>
+    <string name="schedule_save">Programar reserva</string>
+    <string name="schedule_saved">Programada. Se intentará reservar el %1$s.</string>
     <plurals name="booking_free_slots">
         <item quantity="one">%d libre</item>
         <item quantity="other">%d libres</item>
+        <item quantity="many">%d libres</item>
     </plurals>
     <string name="reservation_available">Disponible</string>
     <!-- "hasta las 20:00 · 90 min" -->
@@ -54,6 +70,7 @@
     <plurals name="reservation_limit_reached">
         <item quantity="one">Ya tienes %d reserva, el máximo del club. Anúlala en Mis reservas para poder reservar otra.</item>
         <item quantity="other">Ya tienes %d reservas, el máximo del club. Anula una en Mis reservas para poder reservar otra.</item>
+        <item quantity="many">Ya tienes %d reservas, el máximo del club. Anula una en Mis reservas para poder reservar otra.</item>
     </plurals>
     <string name="reservation_error_unknown">No se ha podido hacer la reserva. Vuelve a intentarlo más tarde.</string>
 
@@ -67,8 +84,14 @@
     <plurals name="reservations_in_days">
         <item quantity="one">en %d día</item>
         <item quantity="other">en %d días</item>
+        <item quantity="many">en %d días</item>
     </plurals>
     <string name="reservations_cancelled_tag">Anulada</string>
+    <string name="reservations_scheduled_tag">Programada</string>
+    <!-- "Se intentará reservar el sábado 24 a las 9:00" -->
+    <string name="reservations_scheduled_when">Se intentará reservar el %1$s</string>
+    <string name="reservations_scheduled_cancel">Cancelar programación</string>
+    <string name="reservations_scheduled_cancelled">Programación cancelada</string>
     <string name="reservations_cancel">Anular</string>
     <string name="reservations_cancel_title">¿Anular la reserva?</string>
     <!-- "Lunes, 26 de octubre · 17:30 – 19:00" -->

@@ -30,6 +30,13 @@ object Syltek {
     const val RESERVATION_DETAIL_PATH = "customerzone/showreservation/"
     const val CANCEL_RESERVATION_PATH = "customerzone/cancelReservation/"
 
+    /**
+     * Cada día se abre para reservar a las 9:00 (hora de Madrid) siete días antes (confirmado por el club,
+     * 23/10/2026). El último día abierto en cada momento lo da `nowUtcMaxAvailability` de la parrilla.
+     */
+    const val BOOKING_OPENS_DAYS_BEFORE = 7L
+    val BOOKING_OPENS_AT: java.time.LocalTime = java.time.LocalTime.of(9, 0)
+
     /** El club solo deja tener a la vez este número de reservas activas; al anular una se puede volver a reservar. */
     const val MAX_ACTIVE_RESERVATIONS = 2
 

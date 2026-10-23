@@ -39,6 +39,7 @@ El CI (`.github/workflows/ci.yml`) ejecuta lo mismo en cada push a `main` y en c
   - La parrilla (`data/booking/`) se lee con `TimetableParser` y los huecos los calcula `SlotCalculator` (lógica pura, sin red). Si la web cambia y algo deja de leerse, el arreglo va ahí y en `docs/syltek-api.md`.
   - Mis reservas (`data/reservations/`): `ReservationsParser` lee el listado y el detalle (la pista solo viene en el detalle; se pide solo para las próximas). **Anular es un GET que borra datos: una sola petición, nunca reintentada**, y el resultado se comprueba recargando el listado. `ReservationsChangeNotifier` avisa de reservas y anulaciones para que la parrilla y Mis reservas se recarguen solas.
   - Perfil (`data/profile/`): `ProfileParser` lee "Mi Cuenta". `ProfileRepository` guarda los datos **solo en memoria** (son personales; no van a disco) y los comparte con el saludo de la parrilla; se borran al cerrar sesión.
+  - Reserva programada (`data/scheduled/`, ver `docs/plan-reserva-programada.md`): cada día se abre a las 9:00 de Madrid 7 días antes (`Syltek.BOOKING_OPENS_*`); el último día abierto lo da `nowUtcMaxAvailability`. Las programaciones se guardan en DataStore como JSON (`ScheduledBookingRepository`), sin cifrar porque no son datos sensibles.
   - **Al investigar páginas nuevas de la web con la sesión del usuario: registrar solo la estructura (etiquetas, tipos de elemento, longitudes), nunca los valores**, y quitar el log y borrar el registro del móvil al terminar.
 - El login no tiene registro.
 

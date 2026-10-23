@@ -22,12 +22,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SnackbarHost
@@ -46,8 +48,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -62,9 +68,11 @@ import com.dgalan.padelprat.core.network.Syltek
 import com.dgalan.padelprat.data.reservations.Reservation
 import com.dgalan.padelprat.data.reservations.ReservationCourt
 import com.dgalan.padelprat.data.reservations.ReservationStatus
+import com.dgalan.padelprat.data.scheduled.ScheduledBooking
 import com.dgalan.padelprat.ui.components.PillSwitch
 import com.dgalan.padelprat.ui.theme.PadelPratTheme
 import java.time.Duration
+import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -79,6 +87,7 @@ fun ReservationsScreen(modifier: Modifier = Modifier, viewModel: ReservationsVie
         uiState = uiState,
         onTabSelect = viewModel::onTabSelect,
         onCancelClick = viewModel::onCancelClick,
+        onScheduleCancel = viewModel::onScheduleCancel,
         onRefresh = viewModel::onRefresh,
         onRetry = viewModel::onRetry,
         onMessageShow = viewModel::onMessageShow,
@@ -101,6 +110,7 @@ private fun ReservationsContent(
     uiState: ReservationsUiState,
     onTabSelect: (ReservationsTab) -> Unit,
     onCancelClick: (Reservation) -> Unit,
+    onScheduleCancel: (String) -> Unit,
     onRefresh: () -> Unit,
     onRetry: () -> Unit,
     onMessageShow: () -> Unit,
@@ -152,7 +162,8 @@ private fun ReservationsContent(
                         action = { Button(onClick = onRetry) { Text(stringResource(R.string.booking_retry)) } }
                     )
 
-                    is ReservationsContent.Loaded -> ReservationList(uiState.tab, content, onCancelClick)
+                    is ReservationsContent.Loaded ->
+                        ReservationList(uiState.tab, content, uiState.scheduled, onCancelClick, onScheduleCancel)
                 }
             }
         }
@@ -169,14 +180,18 @@ private fun ReservationsContent(
 private fun ReservationList(
     tab: ReservationsTab,
     content: ReservationsContent.Loaded,
-    onCancelClick: (Reservation) -> Unit
+    scheduled: List<ScheduledBooking>,
+    onCancelClick: (Reservation) -> Unit,
+    onScheduleCancel: (String) -> Unit
 ) {
     val reservations = when (tab) {
         ReservationsTab.Upcoming -> content.upcoming
         ReservationsTab.Past -> content.past
         ReservationsTab.Cancelled -> content.cancelled
     }
-    if (reservations.isEmpty()) {
+    // Las programadas solo en Próximas, encima de las reservas reales
+    val shownScheduled = if (tab == ReservationsTab.Upcoming) scheduled else emptyList()
+    if (reservations.isEmpty() && shownScheduled.isEmpty()) {
         MessageState(message = stringResource(tab.emptyRes()))
         return
     }
@@ -185,6 +200,9 @@ private fun ReservationList(
         verticalArrangement = Arrangement.spacedBy(10.dp),
         modifier = Modifier.fillMaxSize()
     ) {
+        items(shownScheduled, key = { "scheduled-${it.id}" }) { booking ->
+            ScheduledCard(booking, onCancelClick = { onScheduleCancel(booking.id) })
+        }
         itemsIndexed(reservations, key = { _, reservation -> reservation.id }) { index, reservation ->
             when (tab) {
                 // La más cercana va destacada, como en el mock
@@ -229,6 +247,71 @@ private fun UpcomingCard(reservation: Reservation, highlighted: Boolean, onCance
             OutlinedButton(onClick = { onCancelClick(reservation) }, modifier = Modifier.padding(top = 4.dp)) {
                 Text(stringResource(R.string.reservations_cancel))
             }
+        }
+    }
+}
+
+/**
+ * Reserva programada: todavía no es una reserva. Se distingue de las reales con el borde discontinuo, el reloj y la
+ * etiqueta "Programada" (no lima).
+ */
+@Composable
+private fun ScheduledCard(booking: ScheduledBooking, onCancelClick: () -> Unit) {
+    val scheme = MaterialTheme.colorScheme
+    val dashColor = scheme.outline
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .drawBehind {
+                val stroke = 1.5.dp.toPx()
+                drawRoundRect(
+                    color = dashColor,
+                    topLeft = Offset(stroke / 2, stroke / 2),
+                    size = Size(size.width - stroke, size.height - stroke),
+                    cornerRadius = CornerRadius(24.dp.toPx()),
+                    style = Stroke(width = stroke, pathEffect = PathEffect.dashPathEffect(floatArrayOf(14f, 10f)))
+                )
+            }
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                painter = painterResource(R.drawable.ic_schedule),
+                contentDescription = null,
+                tint = scheme.onSecondaryContainer,
+                modifier = Modifier.size(16.dp)
+            )
+            Spacer(Modifier.width(6.dp))
+            Tag(
+                text = stringResource(R.string.reservations_scheduled_tag),
+                background = scheme.secondaryContainer,
+                content = scheme.onSecondaryContainer
+            )
+            Spacer(Modifier.weight(1f))
+            Text(
+                text = booking.date.longDate(),
+                style = MaterialTheme.typography.bodySmall,
+                color = scheme.onSurfaceVariant
+            )
+        }
+        Text(
+            text = "${booking.start.format(TIME_FORMAT)} – ${booking.end.format(TIME_FORMAT)}",
+            style = MaterialTheme.typography.titleLarge,
+            color = scheme.onSurface
+        )
+        Text(
+            text = booking.courts.joinToString(" → ") { it.name },
+            style = MaterialTheme.typography.bodyMedium,
+            color = scheme.onSurfaceVariant
+        )
+        Text(
+            text = stringResource(R.string.reservations_scheduled_when, booking.opensAt.openingText()),
+            style = MaterialTheme.typography.bodySmall,
+            color = scheme.onSurfaceVariant
+        )
+        TextButton(onClick = onCancelClick, modifier = Modifier.padding(top = 2.dp)) {
+            Text(stringResource(R.string.reservations_scheduled_cancel))
         }
     }
 }
@@ -444,6 +527,11 @@ private val SPANISH = Locale.forLanguageTag("es-ES")
 private val TIME_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
 private val LONG_DATE: DateTimeFormatter = DateTimeFormatter.ofPattern("EEEE, d 'de' MMMM", SPANISH)
 
+private val OPENING_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("EEEE d 'a las' H:mm", SPANISH)
+
+/** "el sábado 24 a las 9:00". */
+private fun Instant.openingText(): String = atZone(Syltek.ZONE).format(OPENING_FORMAT)
+
 private fun Reservation.timeRange(): String = "${start.format(TIME_FORMAT)} – ${end.format(TIME_FORMAT)}"
 
 @Composable
@@ -505,6 +593,7 @@ private fun CancelMessage.textRes(): Int = when (this) {
     CancelMessage.Cancelled -> R.string.reservations_cancel_done
     CancelMessage.NotCancelled -> R.string.reservations_cancel_not_done
     CancelMessage.Uncertain -> R.string.reservations_cancel_uncertain
+    CancelMessage.ScheduleCancelled -> R.string.reservations_scheduled_cancelled
 }
 
 @Preview(showBackground = true)
@@ -532,6 +621,7 @@ private fun ReservationsContentPreview() {
             ),
             onTabSelect = {},
             onCancelClick = {},
+            onScheduleCancel = {},
             onRefresh = {},
             onRetry = {},
             onMessageShow = {}

@@ -44,6 +44,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -74,6 +76,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
@@ -104,17 +107,37 @@ import kotlinx.coroutines.delay
 @Composable
 fun BookingScreen(modifier: Modifier = Modifier, viewModel: BookingViewModel = hiltViewModel()) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val message = (uiState.message as? BookingMessage.Scheduled)?.let {
+        stringResource(R.string.schedule_saved, it.opensAt.openingText())
+    }
+    LaunchedEffect(message) {
+        if (message != null) {
+            snackbarHostState.showSnackbar(message)
+            viewModel.onMessageShow()
+        }
+    }
 
-    BookingContent(
-        uiState = uiState,
-        onDaySelect = viewModel::onDaySelect,
-        onDayPartSelect = viewModel::onDayPartSelect,
-        onDurationSelect = viewModel::onDurationSelect,
-        onSlotClick = viewModel::onSlotClick,
-        onRefresh = viewModel::onRefresh,
-        onRetry = viewModel::onRetry,
-        modifier = modifier
-    )
+    Box(modifier = modifier) {
+        BookingContent(
+            uiState = uiState,
+            onDaySelect = viewModel::onDaySelect,
+            onDayPartSelect = viewModel::onDayPartSelect,
+            onDurationSelect = viewModel::onDurationSelect,
+            onSlotClick = viewModel::onSlotClick,
+            onScheduleTimeSelect = viewModel::onScheduleTimeSelect,
+            onScheduleCourtToggle = viewModel::onScheduleCourtToggle,
+            onScheduleSave = viewModel::onScheduleSave,
+            onRefresh = viewModel::onRefresh,
+            onRetry = viewModel::onRetry
+        )
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(16.dp)
+        )
+    }
 
     uiState.sheet?.let { sheet ->
         ReservationBottomSheet(
@@ -139,6 +162,9 @@ private fun BookingContent(
     onDayPartSelect: (DayPart) -> Unit,
     onDurationSelect: (Int) -> Unit,
     onSlotClick: (courtId: Int, start: Instant) -> Unit,
+    onScheduleTimeSelect: (LocalTime) -> Unit,
+    onScheduleCourtToggle: (Int) -> Unit,
+    onScheduleSave: () -> Unit,
     onRefresh: () -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier
@@ -223,6 +249,9 @@ private fun BookingContent(
                 } else {
                     courtItems(content.courts, uiState.sheet?.selectedSlot, playedEntrances, onSlotClick)
                 }
+
+                is BookingContent.Schedule ->
+                    scheduleItems(content.form, onScheduleTimeSelect, onScheduleCourtToggle, onScheduleSave)
             }
         }
     }
@@ -317,7 +346,12 @@ private fun Filters(
     val durationLabel = stringResource(R.string.booking_duration)
     Column(modifier = modifier.background(MaterialTheme.colorScheme.surface)) {
         Spacer(Modifier.height(16.dp))
-        DaySelector(days = uiState.days, selectedDay = uiState.selectedDay, onDaySelect = onDaySelect)
+        DaySelector(
+            days = uiState.days,
+            selectedDay = uiState.selectedDay,
+            isLocked = uiState::isLocked,
+            onDaySelect = onDaySelect
+        )
         Spacer(Modifier.height(12.dp))
         Row(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -351,7 +385,12 @@ private fun Filters(
 private val DAY_PART_ORDER = listOf(DayPart.Afternoon, DayPart.Morning)
 
 @Composable
-private fun DaySelector(days: List<LocalDate>, selectedDay: LocalDate, onDaySelect: (LocalDate) -> Unit) {
+private fun DaySelector(
+    days: List<LocalDate>,
+    selectedDay: LocalDate,
+    isLocked: (LocalDate) -> Boolean,
+    onDaySelect: (LocalDate) -> Unit
+) {
     val today = LocalDate.now(Syltek.ZONE)
     LazyRow(
         state = rememberLazyListState(),
@@ -359,27 +398,63 @@ private fun DaySelector(days: List<LocalDate>, selectedDay: LocalDate, onDaySele
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         items(days, key = { it.toEpochDay() }) { day ->
-            DayChip(day = day, isToday = day == today, selected = day == selectedDay, onClick = { onDaySelect(day) })
+            DayChip(
+                day = day,
+                isToday = day == today,
+                selected = day == selectedDay,
+                locked = isLocked(day),
+                onClick = { onDaySelect(day) }
+            )
         }
     }
 }
 
+/** Los días aún cerrados (solo se pueden programar) van más apagados y con un reloj en la esquina. */
 @Composable
-private fun DayChip(day: LocalDate, isToday: Boolean, selected: Boolean, onClick: () -> Unit) {
+private fun DayChip(day: LocalDate, isToday: Boolean, selected: Boolean, locked: Boolean, onClick: () -> Unit) {
     val scheme = MaterialTheme.colorScheme
     val label = if (isToday) stringResource(R.string.booking_today) else day.dayOfWeek.shortName()
-    Column(
+    val background = when {
+        selected -> scheme.primary
+        locked -> scheme.surfaceContainerHigh
+        else -> scheme.surfaceVariant
+    }
+    val color = when {
+        selected -> scheme.onPrimary
+        locked -> scheme.onSurfaceVariant.copy(alpha = 0.7f)
+        else -> scheme.onSurfaceVariant
+    }
+    val lockedDescription = stringResource(R.string.schedule_day_locked)
+    Box(
         modifier = Modifier
             .width(64.dp)
-            .background(if (selected) scheme.primary else scheme.surfaceVariant, RoundedCornerShape(16.dp))
+            .background(background, RoundedCornerShape(16.dp))
             .clickable(role = Role.Tab, onClick = onClick)
-            .semantics { this.selected = selected }
-            .padding(vertical = 8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+            .semantics {
+                this.selected = selected
+                if (locked) stateDescription = lockedDescription
+            }
     ) {
-        val color = if (selected) scheme.onPrimary else scheme.onSurfaceVariant
-        Text(label, style = MaterialTheme.typography.labelMedium, color = color)
-        Text(day.dayOfMonth.toString(), style = MaterialTheme.typography.titleMedium, color = color)
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(label, style = MaterialTheme.typography.labelMedium, color = color)
+            Text(day.dayOfMonth.toString(), style = MaterialTheme.typography.titleMedium, color = color)
+        }
+        if (locked) {
+            Icon(
+                painter = painterResource(R.drawable.ic_schedule),
+                contentDescription = null,
+                tint = color,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(5.dp)
+                    .size(12.dp)
+            )
+        }
     }
 }
 
@@ -656,12 +731,16 @@ private fun BookingContentPreview() {
                 days = (0L until 8L).map(today::plusDays),
                 selectedDay = today,
                 dayPart = DayPart.Afternoon,
+                lastOpenDay = today.plusDays(7),
                 content = BookingContent.Loaded(listOf(CourtSlots(court, slots)))
             ),
             onDaySelect = {},
             onDayPartSelect = {},
             onDurationSelect = {},
             onSlotClick = { _, _ -> },
+            onScheduleTimeSelect = {},
+            onScheduleCourtToggle = {},
+            onScheduleSave = {},
             onRefresh = {},
             onRetry = {}
         )
