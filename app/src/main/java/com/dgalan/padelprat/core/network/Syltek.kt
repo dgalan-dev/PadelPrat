@@ -30,6 +30,9 @@ object Syltek {
     const val RESERVATION_DETAIL_PATH = "customerzone/showreservation/"
     const val CANCEL_RESERVATION_PATH = "customerzone/cancelReservation/"
 
+    /** "Mi Cuenta": datos del usuario (solo lectura en la app). */
+    const val ACCOUNT_PATH = "customerzone/account/"
+
     /** Página tras el login. */
     const val HOME_PATH = "/customerzone/index"
 

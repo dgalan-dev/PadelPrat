@@ -3,6 +3,7 @@ package com.dgalan.padelprat.data.auth
 import com.dgalan.padelprat.core.network.PersistentCookieJar
 import com.dgalan.padelprat.core.network.SessionExpiredNotifier
 import com.dgalan.padelprat.core.network.Syltek
+import com.dgalan.padelprat.data.profile.ProfileRepository
 import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -19,7 +20,8 @@ import kotlinx.coroutines.flow.map
 class AuthRepository @Inject constructor(
     private val remote: AuthRemoteDataSource,
     private val cookieJar: PersistentCookieJar,
-    private val sessionExpiredNotifier: SessionExpiredNotifier
+    private val sessionExpiredNotifier: SessionExpiredNotifier,
+    private val profileRepository: ProfileRepository
 ) {
 
     /** `true` mientras haya una cookie de sesión guardada y sin caducar. */
@@ -58,5 +60,6 @@ class AuthRepository @Inject constructor(
         }
         cookieJar.clear()
         sessionExpiredNotifier.reset()
+        profileRepository.clear()
     }
 }

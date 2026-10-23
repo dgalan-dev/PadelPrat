@@ -398,6 +398,29 @@ GET /customerzone/cancelReservation/{id}
 - **Comprobado desde la app el 23/10/2026**: tras el 303, el listado muestra la reserva como `Anulada`
   y la hora vuelve a salir libre en la parrilla.
 
+### 6.4 Mi cuenta (datos del usuario)
+
+> **Comprobado el 23/10/2026** (estructura de la página; sin guardar ningún dato personal).
+
+`GET /customerzone/account/` → 200 HTML, título "Mi Cuenta". Los datos se muestran como campos de solo
+lectura: cada uno es una `label` con su nombre seguida (tras un `<br>`) de un **`input` sin `name`** con el
+valor en `value`. Varias parejas etiqueta/valor comparten la misma columna (`div.o-layout__column-2`), así que
+el valor de una etiqueta es el primer `input` que hay después de ella y antes de la siguiente `label`.
+
+| Etiqueta | Uso en la app |
+| --- | --- |
+| `Nombre` | Cabecera de Perfil, iniciales y saludo "Hola, …" de la parrilla. |
+| `Email` | Cabecera de Perfil. |
+| `Teléfono` | Datos de contacto. |
+| `Dirección`, `Cod. Postal`, `Población, Ciudad` | Datos de contacto (si están rellenados). |
+| `Género`, `Otro Email`, `Otro Teléfono` | No se usan. |
+
+- También hay tres `input[type=checkbox]` con nombre (`PrivacyPolicy`, `CommercialCommunications`,
+  `ComunicationModeEmail`) y un formulario `#frmFile` (subir archivo). La app no los toca.
+- El menú lleva enlaces a más secciones sin documentar: `levels`, `vouchers`, `payments`, `saleitems`,
+  `contacts`, `surveys`, `communications`, `password`, `files`, `joinme`, `activities`, `school`, `rankings`,
+  `tournaments` (todas bajo `/customerzone/`).
+
 ---
 
 ## 7. Guía de implementación Android

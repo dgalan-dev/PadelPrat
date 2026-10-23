@@ -179,12 +179,21 @@ private fun BookingContent(
             modifier = Modifier.fillMaxSize()
         ) {
             item(key = "title") {
-                Text(
-                    text = stringResource(R.string.booking_title),
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp)
-                )
+                Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp)) {
+                    // "Hola, Marc", como en el mock; hasta que llegan los datos del perfil, solo el título
+                    uiState.firstName?.let {
+                        Text(
+                            text = stringResource(R.string.booking_greeting, it),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Text(
+                        text = stringResource(R.string.booking_title),
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
             }
             stickyHeader(key = "filters") {
                 Filters(

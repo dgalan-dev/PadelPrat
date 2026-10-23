@@ -15,6 +15,7 @@ import com.dgalan.padelprat.data.booking.SlotCalculator
 import com.dgalan.padelprat.data.booking.SlotState
 import com.dgalan.padelprat.data.booking.TimetableRepository
 import com.dgalan.padelprat.data.booking.TimetableResult
+import com.dgalan.padelprat.data.profile.ProfileRepository
 import com.dgalan.padelprat.data.reservations.ReservationsChangeNotifier
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.time.Instant
@@ -83,7 +84,9 @@ data class BookingUiState(
     /** Minutos que se quieren reservar: solo se ofrecen los huecos donde caben. */
     val durationMinutes: Int = DEFAULT_DURATION,
     val content: BookingContent = BookingContent.Loading,
-    val sheet: ReservationSheet? = null
+    val sheet: ReservationSheet? = null,
+    /** Para el saludo; `null` hasta que llegan los datos del perfil. */
+    val firstName: String? = null
 )
 
 /** Lo habitual es reservar un partido de hora y media. */
@@ -93,7 +96,8 @@ private const val DEFAULT_DURATION = 90
 class BookingViewModel @Inject constructor(
     private val repository: TimetableRepository,
     private val reservationRepository: ReservationRepository,
-    changeNotifier: ReservationsChangeNotifier
+    changeNotifier: ReservationsChangeNotifier,
+    profileRepository: ProfileRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(initialState())
@@ -105,6 +109,11 @@ class BookingViewModel @Inject constructor(
 
     init {
         load(_uiState.value.selectedDay)
+        viewModelScope.launch {
+            profileRepository.profile.collect { profile -> _uiState.update { it.copy(firstName = profile?.firstName) } }
+        }
+        // Perfil también los pide; si ya están, no hace falta otra petición
+        if (profileRepository.profile.value == null) viewModelScope.launch { profileRepository.refresh() }
         // Si las reservas cambian (p. ej. se anula una en Mis reservas), las parrillas guardadas ya no valen. Con la
         // hoja abierta no se recarga: al cerrarla ya se recarga si hace falta.
         viewModelScope.launch {
