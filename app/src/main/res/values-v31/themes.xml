@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!--
+        Android 12+: el sistema anima el icono de la pantalla de arranque, así que se usa la versión animada (la bola
+        bota). En versiones anteriores se queda el icono fijo de values/themes.xml.
+    -->
+    <style name="Theme.PadelPrat.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/window_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/avd_splash</item>
+        <item name="windowSplashScreenAnimationDuration">350</item>
+        <item name="postSplashScreenTheme">@style/Theme.PadelPrat</item>
+    </style>
+</resources>

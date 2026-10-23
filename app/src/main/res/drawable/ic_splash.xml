@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Icono de la pantalla de arranque: la bola del icono de la app sobre su círculo azul (primary). Se dibuja aquí en
+    lugar de usar windowSplashScreenIconBackgroundColor porque algunos móviles (p. ej. Samsung) ignoran ese color.
+    El sistema recorta el icono en un círculo de 2/3 del lienzo, así que el círculo azul va dentro de ese margen.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FF1E4FA3"
+        android:pathData="M18,54a36,36 0,1 0,72 0a36,36 0,1 0,-72 0z" />
+    <!-- La misma bola y al mismo tamaño que en el icono de la app (ic_launcher_foreground) -->
+    <!-- Sombra suave para despegar la bola del fondo -->
+    <path
+        android:fillColor="#33000000"
+        android:pathData="M30,56a26,26 0,1 0,52 0a26,26 0,1 0,-52 0z" />
+    <path
+        android:fillColor="#FFB8E63A"
+        android:pathData="M28,54a26,26 0,1 0,52 0a26,26 0,1 0,-52 0z" />
+    <!-- Costuras, recortadas a la silueta de la bola para que no sobresalgan -->
+    <group>
+        <clip-path android:pathData="M28,54a26,26 0,1 0,52 0a26,26 0,1 0,-52 0z" />
+        <path
+            android:pathData="M36.7,34.6a26,26 0,0 1,0 38.8"
+            android:strokeWidth="3.4"
+            android:strokeColor="#FFFFFFFF"
+            android:strokeLineCap="round" />
+        <path
+            android:pathData="M71.3,34.6a26,26 0,0 0,0 38.8"
+            android:strokeWidth="3.4"
+            android:strokeColor="#FFFFFFFF"
+            android:strokeLineCap="round" />
+    </group>
+</vector>

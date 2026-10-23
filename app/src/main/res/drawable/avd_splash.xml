@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Pantalla de arranque animada (Android 12+): la bola de ic_splash cae dentro del círculo azul y bota, mientras su
+    sombra crece al acercarse al suelo. Es corta (350 ms: toca el suelo a los ~125 ms) para que quepa en lo que ya
+    dura el arranque sin añadir espera.
+    - La bola y la sombra se recortan al círculo azul aquí mismo: no todos los móviles recortan el icono en círculo.
+    - El dibujo empieza con la bola arriba, fuera del círculo: el sistema puede enseñarlo un instante antes de
+      animarlo, y así no se ve la bola en su sitio saltando hacia arriba.
+-->
+<animated-vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt">
+    <aapt:attr name="android:drawable">
+        <vector
+            android:width="108dp"
+            android:height="108dp"
+            android:viewportWidth="108"
+            android:viewportHeight="108">
+            <path
+                android:fillColor="#FF1E4FA3"
+                android:pathData="M18,54a36,36 0,1 0,72 0a36,36 0,1 0,-72 0z" />
+            <group>
+            <clip-path android:pathData="M18,54a36,36 0,1 0,72 0a36,36 0,1 0,-72 0z" />
+            <group
+                android:name="shadow"
+                android:pivotX="56"
+                android:pivotY="56"
+                android:scaleX="0.4"
+                android:scaleY="0.4">
+                <path
+                    android:fillColor="#33000000"
+                    android:pathData="M30,56a26,26 0,1 0,52 0a26,26 0,1 0,-52 0z" />
+            </group>
+            <group
+                android:name="ball"
+                android:translateY="-62">
+                <path
+                    android:fillColor="#FFB8E63A"
+                    android:pathData="M28,54a26,26 0,1 0,52 0a26,26 0,1 0,-52 0z" />
+                <group>
+                    <clip-path android:pathData="M28,54a26,26 0,1 0,52 0a26,26 0,1 0,-52 0z" />
+                    <path
+                        android:pathData="M36.7,34.6a26,26 0,0 1,0 38.8"
+                        android:strokeWidth="3.4"
+                        android:strokeColor="#FFFFFFFF"
+                        android:strokeLineCap="round" />
+                    <path
+                        android:pathData="M71.3,34.6a26,26 0,0 0,0 38.8"
+                        android:strokeWidth="3.4"
+                        android:strokeColor="#FFFFFFFF"
+                        android:strokeLineCap="round" />
+                </group>
+            </group>
+            </group>
+        </vector>
+    </aapt:attr>
+
+    <!-- La bola cae desde arriba y bota hasta quedarse en su sitio -->
+    <target android:name="ball">
+        <aapt:attr name="android:animation">
+            <objectAnimator
+                android:duration="350"
+                android:interpolator="@android:interpolator/bounce"
+                android:propertyName="translateY"
+                android:valueFrom="-62"
+                android:valueTo="0" />
+        </aapt:attr>
+    </target>
+
+    <!-- La sombra crece a la vez, como si la bola se acercara al suelo -->
+    <target android:name="shadow">
+        <aapt:attr name="android:animation">
+            <set>
+                <objectAnimator
+                    android:duration="350"
+                    android:interpolator="@android:interpolator/bounce"
+                    android:propertyName="scaleX"
+                    android:valueFrom="0.4"
+                    android:valueTo="1" />
+                <objectAnimator
+                    android:duration="350"
+                    android:interpolator="@android:interpolator/bounce"
+                    android:propertyName="scaleY"
+                    android:valueFrom="0.4"
+                    android:valueTo="1" />
+            </set>
+        </aapt:attr>
+    </target>
+</animated-vector>
