@@ -54,6 +54,31 @@
     <string name="reservation_error_unknown">No se ha podido hacer la reserva. Vuelve a intentarlo más tarde.</string>
 
     <string name="reservations_title">Mis reservas</string>
+    <string name="reservations_tab_upcoming">Próximas</string>
+    <string name="reservations_tab_past">Pasadas</string>
+    <string name="reservations_tab_cancelled">Anuladas</string>
+    <string name="reservations_tomorrow">Mañana</string>
+    <string name="reservations_in_minutes">en %1$d min</string>
+    <string name="reservations_in_hours">en %1$d h</string>
+    <plurals name="reservations_in_days">
+        <item quantity="one">en %d día</item>
+        <item quantity="other">en %d días</item>
+    </plurals>
+    <string name="reservations_cancelled_tag">Anulada</string>
+    <string name="reservations_cancel">Anular</string>
+    <string name="reservations_cancel_title">¿Anular la reserva?</string>
+    <!-- "Lunes, 26 de octubre · 17:30 – 19:00" -->
+    <string name="reservations_cancel_text">%1$s · %2$s</string>
+    <string name="reservations_cancel_confirm">Anular</string>
+    <string name="reservations_cancel_back">Volver</string>
+    <string name="reservations_cancel_done">Reserva anulada</string>
+    <string name="reservations_cancel_not_done">No se ha podido anular la reserva</string>
+    <string name="reservations_cancel_uncertain">No se ha podido comprobar si se ha anulado. Revisa la lista cuando tengas conexión.</string>
+    <string name="reservations_empty_upcoming">No tienes próximas reservas</string>
+    <string name="reservations_empty_past">No tienes reservas en los últimos 6 meses</string>
+    <string name="reservations_empty_cancelled">No tienes reservas anuladas</string>
+    <string name="reservations_error_network">No hay conexión. Revisa tu internet y vuelve a intentarlo.</string>
+    <string name="reservations_error_unknown">No se han podido cargar tus reservas. Vuelve a intentarlo más tarde.</string>
     <string name="profile_title">Perfil</string>
     <string name="profile_logout">Cerrar sesión</string>
 </resources>

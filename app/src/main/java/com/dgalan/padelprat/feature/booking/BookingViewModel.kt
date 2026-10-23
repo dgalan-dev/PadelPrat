@@ -15,6 +15,7 @@ import com.dgalan.padelprat.data.booking.SlotCalculator
 import com.dgalan.padelprat.data.booking.SlotState
 import com.dgalan.padelprat.data.booking.TimetableRepository
 import com.dgalan.padelprat.data.booking.TimetableResult
+import com.dgalan.padelprat.data.reservations.ReservationsChangeNotifier
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.time.Instant
 import java.time.LocalDate
@@ -91,7 +92,8 @@ private const val DEFAULT_DURATION = 90
 @HiltViewModel
 class BookingViewModel @Inject constructor(
     private val repository: TimetableRepository,
-    private val reservationRepository: ReservationRepository
+    private val reservationRepository: ReservationRepository,
+    changeNotifier: ReservationsChangeNotifier
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(initialState())
@@ -103,6 +105,14 @@ class BookingViewModel @Inject constructor(
 
     init {
         load(_uiState.value.selectedDay)
+        // Si las reservas cambian (p. ej. se anula una en Mis reservas), las parrillas guardadas ya no valen. Con la
+        // hoja abierta no se recarga: al cerrarla ya se recarga si hace falta.
+        viewModelScope.launch {
+            changeNotifier.changes.collect {
+                timetables.clear()
+                if (_uiState.value.sheet == null) load(_uiState.value.selectedDay)
+            }
+        }
     }
 
     fun onDaySelect(day: LocalDate) {

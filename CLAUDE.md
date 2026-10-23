@@ -37,6 +37,7 @@ El CI (`.github/workflows/ci.yml`) ejecuta lo mismo en cada push a `main` y en c
   - Un solo entorno (producción), en `BuildConfig.BASE_URL`. No hay variantes de compilación (*flavors*).
   - Fechas y horas con `java.time` (`minSdk 26`) y siempre en la zona del club, `Syltek.ZONE` (`Europe/Madrid`). De la web, usar los campos `*Utc`.
   - La parrilla (`data/booking/`) se lee con `TimetableParser` y los huecos los calcula `SlotCalculator` (lógica pura, sin red). Si la web cambia y algo deja de leerse, el arreglo va ahí y en `docs/syltek-api.md`.
+  - Mis reservas (`data/reservations/`): `ReservationsParser` lee el listado y el detalle (la pista solo viene en el detalle; se pide solo para las próximas). **Anular es un GET que borra datos: una sola petición, nunca reintentada**, y el resultado se comprueba recargando el listado. `ReservationsChangeNotifier` avisa de reservas y anulaciones para que la parrilla y Mis reservas se recarguen solas.
 - El login no tiene registro.
 
 ## Convenciones

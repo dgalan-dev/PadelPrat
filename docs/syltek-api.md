@@ -379,6 +379,11 @@ Cada reserva es una tarjeta `.c-card--game`:
 Las clases de las etiquetas están mal escritas en el HTML (`class="o-form-row label-text"`,
 comillas rotas). Buscar la etiqueta por su **texto** y tomar el `span.o-form__text` siguiente.
 
+> **Estructura comprobada el 23/10/2026:** cada fila es `.o-form-row` con la etiqueta y, aparte, un
+> `div.o-form-row__field` que contiene el valor (`span.o-form__text`). El valor **no** está en el mismo
+> elemento que la etiqueta: hay que subir a `div.o-form-row__field` y mirar su hermano anterior (o el texto
+> de la fila). Así lo hace `ReservationsParser.parseDetailCourt`.
+
 ### 6.3 Anular
 
 ```http
@@ -390,6 +395,8 @@ GET /customerzone/cancelReservation/{id}
 - **Verificar siempre**: tras el 303, cargar el listado y comprobar `Anulada`.
 - La web pide confirmación ("¿Anular la reserva?"); la app debe hacer lo mismo.
 - **GET que borra datos**: nunca precargarlo, cachearlo ni repetirlo en reintentos automáticos.
+- **Comprobado desde la app el 23/10/2026**: tras el 303, el listado muestra la reserva como `Anulada`
+  y la hora vuelve a salir libre en la parrilla.
 
 ---
 

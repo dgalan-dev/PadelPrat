@@ -25,6 +25,11 @@ object Syltek {
     /** Tras confirmar, la web redirige aquí; si redirige a la parrilla es que el hueco ya no es válido. */
     const val CONFIRMATION_PATH = "/booking/confirm"
 
+    /** Mis reservas: listado, detalle (`…/{id}`) y anulación (`…/{id}`, un GET que borra: nunca se reintenta). */
+    const val RESERVATIONS_PATH = "customerzone/reservations"
+    const val RESERVATION_DETAIL_PATH = "customerzone/showreservation/"
+    const val CANCEL_RESERVATION_PATH = "customerzone/cancelReservation/"
+
     /** Página tras el login. */
     const val HOME_PATH = "/customerzone/index"
 

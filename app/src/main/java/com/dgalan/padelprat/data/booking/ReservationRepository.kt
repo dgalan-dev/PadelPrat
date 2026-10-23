@@ -1,5 +1,6 @@
 package com.dgalan.padelprat.data.booking
 
+import com.dgalan.padelprat.data.reservations.ReservationsChangeNotifier
 import java.time.Instant
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -37,7 +38,10 @@ sealed interface ReservationResult {
  * docs/plan-confirmar-reserva.md).
  */
 @Singleton
-class ReservationRepository @Inject constructor(private val remote: ReservationRemoteDataSource) {
+class ReservationRepository @Inject constructor(
+    private val remote: ReservationRemoteDataSource,
+    private val changeNotifier: ReservationsChangeNotifier
+) {
 
     /** Una reserva cada vez: evita reservar dos veces si se lanza otra mientras la primera sigue en curso. */
     private val mutex = Mutex()
@@ -58,7 +62,7 @@ class ReservationRepository @Inject constructor(private val remote: ReservationR
             if (form.selectedDuration != durationMinutes) return ReservationResult.UnknownError
         }
 
-        when (val step = remote.confirm(form)) {
+        val result = when (val step = remote.confirm(form)) {
             is ReservationStep.Ok -> when (val page = step.value) {
                 is ConfirmationPage.Confirmed -> ReservationResult.Success(page.total)
                 is ConfirmationPage.Incomplete -> ReservationResult.Incomplete
@@ -67,6 +71,9 @@ class ReservationRepository @Inject constructor(private val remote: ReservationR
 
             else -> step.toResult(confirming = true)
         }
+        // Mis reservas ha cambiado (o puede haberlo hecho, si el resultado es dudoso)
+        if (result is ReservationResult.Success || result == ReservationResult.Uncertain) changeNotifier.notifyChanged()
+        result
     }
 
     private fun ReservationStep<*>.toResult(confirming: Boolean): ReservationResult = when (this) {
