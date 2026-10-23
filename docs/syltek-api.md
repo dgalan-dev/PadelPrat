@@ -314,6 +314,9 @@ date=26%2F10%2F2026+16%3A30%3A00&idResource=1477&idReservation=489387&paymentPen
 - `date` va en UTC: `16:30:00` es una reserva a las **17:30** de Madrid (UTC+1 tras el cambio de hora).
 - Cómo saber si la reserva está hecha: la página de `/booking/confirm` debe mostrar
   `.c-message-indicator--success`. La app solo la da por hecha si lo encuentra.
+- **Comprobado el 23/10/2026 desde la app** con la cuenta que paga: pre-reserva + confirmación con
+  `paymentPending=true` → la página de `/booking/confirm` muestra `.c-message-indicator--success` y la
+  reserva aparece en la web y en la parrilla como propia.
 - **Sin probar:** si enviar `paymentPending=true` con una cuenta que no paga también confirma (lo esperable,
   importe 0,00 € "a pagar en el club"), y cómo se ve el formulario de una cuenta que paga (HTML de los botones).
 
