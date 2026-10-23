@@ -36,6 +36,23 @@
         <item quantity="one">%d libre</item>
         <item quantity="other">%d libres</item>
     </plurals>
+    <string name="reservation_available">Disponible</string>
+    <!-- "hasta las 20:00 · 90 min" -->
+    <string name="reservation_until">hasta las %1$s · %2$d min</string>
+    <string name="reservation_confirm">Confirmar reserva</string>
+    <string name="reservation_change">Elegir otra hora</string>
+    <string name="reservation_close">Cerrar</string>
+    <string name="reservation_done">Hecho</string>
+    <string name="reservation_success_title">¡Reserva confirmada!</string>
+    <!-- "Viernes, 23 de octubre · 18:30 – 20:00" -->
+    <string name="reservation_success_time">%1$s · %2$s – %3$s</string>
+    <string name="reservation_total">Importe: %1$s</string>
+    <string name="reservation_error_slot_unavailable">Esta hora ya no está disponible. Elige otra.</string>
+    <string name="reservation_error_network">No hay conexión y no se ha reservado nada. Vuelve a intentarlo.</string>
+    <string name="reservation_error_uncertain">Se ha cortado la conexión al confirmar y no sabemos si la reserva se ha hecho. Compruébalo en Mis reservas antes de volver a intentarlo.</string>
+    <string name="reservation_error_incomplete">El club pide un paso más (por ejemplo, elegir cómo pagar) que la app todavía no hace, así que la reserva no está hecha. Termínala desde la web del club.</string>
+    <string name="reservation_error_unknown">No se ha podido hacer la reserva. Vuelve a intentarlo más tarde.</string>
+
     <string name="reservations_title">Mis reservas</string>
     <string name="profile_title">Perfil</string>
     <string name="profile_logout">Cerrar sesión</string>

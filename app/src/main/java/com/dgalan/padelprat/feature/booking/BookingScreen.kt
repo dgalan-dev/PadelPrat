@@ -115,6 +115,14 @@ fun BookingScreen(modifier: Modifier = Modifier, viewModel: BookingViewModel = h
         onRetry = viewModel::onRetry,
         modifier = modifier
     )
+
+    uiState.sheet?.let { sheet ->
+        ReservationBottomSheet(
+            sheet = sheet,
+            onConfirmClick = viewModel::onConfirmClick,
+            onDismiss = viewModel::onSheetDismiss
+        )
+    }
 }
 
 /**
@@ -198,7 +206,7 @@ private fun BookingContent(
                 is BookingContent.Loaded -> if (content.courts.isEmpty()) {
                     item(key = "empty") { EmptyState(uiState.dayPart, uiState.durationMinutes) }
                 } else {
-                    courtItems(content.courts, uiState.selectedSlot, playedEntrances, onSlotClick)
+                    courtItems(content.courts, uiState.sheet?.selectedSlot, playedEntrances, onSlotClick)
                 }
             }
         }
@@ -442,7 +450,7 @@ private fun FreeSlotsTag(count: Int) {
 
 /** Lima de bola. En oscuro tertiaryContainer es un oliva apagado; tertiary mantiene el lima. */
 @Composable
-private fun freeColors() = MaterialTheme.colorScheme.let { scheme ->
+internal fun freeColors() = MaterialTheme.colorScheme.let { scheme ->
     if (isSystemInDarkTheme()) {
         scheme.tertiary to scheme.onTertiary
     } else {

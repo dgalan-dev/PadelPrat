@@ -286,6 +286,37 @@ date=28%2F10%2F2026+9%3A00%3A00&idResource=1478&idReservation=489338&paymentPend
 Respuesta: `303` a `/booking/confirm?prereservationCode=<token>` → `200` "Reserva Confirmada".
 El `prereservationCode` es un token opaco en Base64: no se construye, se lee del `Location`.
 
+### 5.4 bis Cuentas que pagan la reserva
+
+> **Comprobado el 23/10/2026 con una cuenta que sí paga** (capturado desde el navegador, pestaña Network).
+
+Con una cuenta que paga, el formulario de la pre-reserva (`/customerZone/newReservation`) muestra el
+importe y **dos botones en lugar de "Reservar"**: **"Pagar en el club"** y **"Pagar con tarjeta ahora"**.
+Los dos envían **la misma confirmación** (`POST /customerZone/newReservationPost`); lo que cambia es
+`paymentPending`:
+
+```http
+POST /customerZone/newReservationPost
+Content-Type: application/x-www-form-urlencoded
+Referer: https://prat.syltek.com/customerZone/newReservation
+
+date=26%2F10%2F2026+16%3A30%3A00&idResource=1477&idReservation=489387&paymentPending=true&duration=90
+```
+
+| Botón | `paymentPending` | Resultado |
+| --- | --- | --- |
+| Pagar en el club | `true` | `303` a `/booking/confirm?prereservationCode=…` → reserva hecha, se paga en el club. |
+| (sin elegir: valor vacío, como viene en el formulario) | vacío | `303` a `/booking/confirm?prereservationCode=…`, pero la página muestra el importe y los botones de pago y **no** `.c-message-indicator--success`. La reserva queda pendiente y **se anula sola** al acabar el bloqueo. |
+| Pagar con tarjeta ahora | sin capturar | Lleva a la pasarela de pago. Fuera del alcance de la app por ahora. |
+
+- En el formulario, `paymentPending` llega vacío; es el botón pulsado el que fija el valor. Con la cuenta
+  sin pago del resto del documento, enviarlo vacío confirmaba directamente.
+- `date` va en UTC: `16:30:00` es una reserva a las **17:30** de Madrid (UTC+1 tras el cambio de hora).
+- Cómo saber si la reserva está hecha: la página de `/booking/confirm` debe mostrar
+  `.c-message-indicator--success`. La app solo la da por hecha si lo encuentra.
+- **Sin probar:** si enviar `paymentPending=true` con una cuenta que no paga también confirma (lo esperable,
+  importe 0,00 € "a pagar en el club"), y cómo se ve el formulario de una cuenta que paga (HTML de los botones).
+
 ### 5.5 Página de confirmación
 
 `GET /booking/confirm?prereservationCode=<token>` (recargable, solo lectura).
@@ -480,7 +511,7 @@ interface PadelRepository {
 - [ ] Error al confirmar si otro socio ocupa el hueco.
 - [ ] Confirmar con `duration=90` sin pasar por `updateduration`.
 - [ ] Anular fuera de plazo o con penalización.
-- [ ] Reservas de pago, con jugadores obligatorios o con promociones.
+- [ ] Reservas de pago: "Pagar en el club" documentado (5.4 bis); falta probar `paymentPending=true` con una cuenta que no paga y capturar "Pagar con tarjeta". Jugadores obligatorios y promociones, sin probar.
 - [ ] Comentario (`/booking/addcomment`) y recordatorio (`/bookings/booking/sendReminder/…`).
 - [ ] Lista de espera (`/customerzone/waitinglist`).
 - [ ] Servicio `/timetableService/timetable` (declarado en la parrilla, sin uso).

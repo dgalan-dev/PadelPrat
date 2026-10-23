@@ -73,6 +73,7 @@ dependencies {
     implementation(libs.androidx.datastore)
     implementation(libs.tink.android)
     implementation(libs.androidx.core.splashscreen)
+    implementation(libs.jsoup)
     debugImplementation(libs.androidx.compose.ui.tooling)
     ktlintRuleset(libs.compose.rules.ktlint)
 }

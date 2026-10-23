@@ -1,6 +1,6 @@
 # Plan: Confirmar reserva
 
-Basado en el apartado 5 de `docs/syltek-api.md` y en el segundo mock ("Confirmar reserva"). **Pendiente de revisar y decidir** (ver el final).
+Basado en el apartado 5 de `docs/syltek-api.md`. Primera versión: pantalla completa como en el segundo mock. **Versión actual: bottom sheet** desde la parrilla.
 
 ## Cómo funciona en la web del club
 
@@ -11,37 +11,27 @@ Reservar son dos pasos:
 
 Si se quiere una duración distinta de la que marca el formulario, antes hay que llamar a `updateduration`.
 
-## Plan
+## Enfoque: bottom sheet y bloqueo solo al confirmar
 
-### 1. Elegir hueco (pantalla de reservar)
+- **Al tocar una hora libre** se abre una hoja desde abajo con la información, **sin bloquear nada**: hora de inicio y fin, duración, día, pista, patrocinador y si es cubierta o descubierta. La parrilla sigue visible detrás; cerrar la hoja y elegir otra hora es inmediato.
+- **Al pulsar "Confirmar reserva"** la app hace seguidas la pre-reserva, el cambio de duración (si hace falta) y la confirmación, eligiendo **"Pagar en el club"** (`paymentPending=true`, ver `docs/syltek-api.md` 5.4 bis). La pista queda bloqueada solo unos milisegundos en lugar de 8 minutos, así que **no hay cuenta atrás**.
+- **Mientras se envía**, el botón muestra un indicador y la hoja no se puede cerrar, para que no se pueda reservar dos veces.
 
-Al seleccionar una hora aparece una barra fija abajo: **"Pista 2 · 18:30 · 90 min · Continuar"**. Pulsar un hueco solo lo selecciona; nada se bloquea hasta pulsar **Continuar**.
+## Resultado
 
-### 2. Pantalla "Confirmar reserva" (como en el mock)
+- **Si va bien** (la página del club muestra su mensaje de éxito): la hoja muestra "¡Reserva confirmada!" con una pequeña animación y el importe (leído de la página de confirmación). Al cerrarla, la parrilla del día se recarga y la hora aparece como propia.
+- **Si la web pide un paso más** (la página no muestra el mensaje de éxito): "reserva incompleta", sin reintento.
+- **Si el hueco ya no es válido** (otro socio lo ha cogido): aviso en la hoja y la parrilla se recarga.
+- **Si se corta la conexión antes de confirmar**: no se ha reservado nada; se puede volver a intentar.
+- **Si se corta la conexión al confirmar**: no se sabe si la reserva entró o no, así que **no se reintenta nunca solo** y se avisa de que hay que comprobarlo en Mis reservas.
 
-- **Navegación**: se abre por encima de las pestañas, sin barra inferior, y con flecha atrás.
-- **Al entrar**: hace la pre-reserva y muestra "Reservando la pista…" mientras tanto. Si la duración elegida no es la que viene marcada, llama a `updateduration`.
-- **Tarjeta azul del mock**: etiqueta "Disponible", la hora en grande ("18:30"), "hasta las 20:00 · 90 min", el día y la pista.
-- **Cuenta atrás**: "Tienes 7:43 para confirmar". Si llega a cero, el botón se desactiva y se avisa de que hay que volver a elegir hora.
-- **Botones**: **Confirmar reserva** y **Cambiar horario**, que vuelve atrás. Al volver, la pista sigue bloqueada hasta que pasen los 8 minutos, porque la web no tiene forma de liberarla antes.
+## Técnica
 
-### 3. Resultado
+- **Jsoup** para leer el formulario de la pre-reserva y la página de confirmación, cada uno con su parser aislado (como la parrilla).
+- En `data/booking/`: `ReservationRemoteDataSource` (las tres peticiones), `ReservationRepository.book(pista, inicio, duración)` (las encadena) y `ReservationResult`. El formulario se reenvía tal como llega, y las fechas se formatean como pide la web (hora local en la pre-reserva).
 
-- **Si va bien**: pantalla de "¡Reserva confirmada!" con el día, el horario y el importe (leídos de la página de confirmación), y un botón para volver. La parrilla de ese día se recarga.
-- **Si el hueco ya no es válido**: se vuelve a la parrilla con un aviso y se recarga.
-- **Si se corta la conexión al confirmar**: no se sabe si la reserva entró o no, así que **no se reintenta nunca solo**. Se avisa de que hay que comprobarlo en Mis reservas.
-- **El botón de confirmar** se desactiva mientras se envía, para que no se pueda reservar dos veces.
+## Decisiones (aplicadas como propuesta; se pueden cambiar)
 
-### 4. Técnica
-
-- **Jsoup**: se añade ahora, porque hay que leer el formulario y la página de confirmación. Cada página con su propio parser aislado, como la parrilla.
-- **Repositorio de reserva** en `data/booking/`: `preReserve`, `changeDuration` y `confirm`. Formatea las fechas como pide la web (hora local en la pre-reserva) y reenvía el formulario tal como llega.
-- **Ruta nueva** `ConfirmRoute` en la navegación raíz, con la pista, la hora y la duración.
-
-## Decisiones pendientes
-
-1. **Precio.** El mock muestra el desglose (pista, iluminación y total), pero según el documento, con la cuenta de socio el formulario no muestra precio y la confirmación da 0,00 €. Propuesta: **no mostrar precio** en la confirmación y enseñar solo el importe final en la pantalla de éxito.
-2. **"Añadir jugadores (opcional)"** (sale en el mock): la web lo tiene, pero no está documentado ni probado. Propuesta: **dejarlo fuera** por ahora.
-3. **Cómo probarlo.** Esto crea **reservas reales** en el club, y la pre-reserva bloquea la pista 8 minutos a otros socios aunque no se confirme. Propuesta:
-   - Claude prueba con la sesión del usuario **una sola pre-reserva sin confirmar**, en un hueco de madrugada o de un día lejano, para no molestar a nadie, y así comprueba que se lee bien el formulario.
-   - **La confirmación de verdad la hace el usuario**, con una reserva que realmente quiera.
+1. **Precio**: no se muestra antes de confirmar; solo el importe final en el mensaje de éxito.
+2. **"Añadir jugadores"**: fuera por ahora (no documentado ni probado).
+3. **Pruebas**: confirmar crea reservas reales, así que la primera reserva de verdad la hace el usuario, con una hora que realmente quiera.

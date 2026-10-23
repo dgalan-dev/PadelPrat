@@ -4,9 +4,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dgalan.padelprat.core.network.Syltek
 import com.dgalan.padelprat.data.booking.BOOKING_DURATIONS
+import com.dgalan.padelprat.data.booking.Court
 import com.dgalan.padelprat.data.booking.CourtSlots
 import com.dgalan.padelprat.data.booking.DayPart
 import com.dgalan.padelprat.data.booking.DayTimetable
+import com.dgalan.padelprat.data.booking.ReservationRepository
+import com.dgalan.padelprat.data.booking.ReservationResult
+import com.dgalan.padelprat.data.booking.Slot
 import com.dgalan.padelprat.data.booking.SlotCalculator
 import com.dgalan.padelprat.data.booking.SlotState
 import com.dgalan.padelprat.data.booking.TimetableRepository
@@ -36,6 +40,41 @@ sealed interface BookingContent {
 /** Hueco elegido por el usuario. */
 data class SelectedSlot(val courtId: Int, val start: Instant)
 
+enum class ReservationError {
+    /** Otro socio lo ha cogido o ya no cabe la duración. */
+    SlotUnavailable,
+
+    /** Sin conexión antes de confirmar: no se ha reservado nada. */
+    Network,
+
+    /** Se cortó al confirmar: no se sabe si se ha reservado. No se ofrece reintentar. */
+    Uncertain,
+
+    /** La web pide un paso más (p. ej. elegir cómo pagar) que la app aún no hace: la reserva no está hecha. */
+    Incomplete,
+    Unknown
+}
+
+sealed interface ReservationStatus {
+    data object Idle : ReservationStatus
+
+    data object Booking : ReservationStatus
+
+    data class Success(val total: String?) : ReservationStatus
+
+    data class Failed(val error: ReservationError) : ReservationStatus
+}
+
+/** Hoja de reserva abierta sobre un hueco libre. Abrirla no bloquea nada: solo se reserva al confirmar. */
+data class ReservationSheet(
+    val court: Court,
+    val slot: Slot,
+    val durationMinutes: Int,
+    val status: ReservationStatus = ReservationStatus.Idle
+) {
+    val selectedSlot: SelectedSlot get() = SelectedSlot(court.id, slot.start)
+}
+
 data class BookingUiState(
     val days: List<LocalDate>,
     val selectedDay: LocalDate,
@@ -43,14 +82,17 @@ data class BookingUiState(
     /** Minutos que se quieren reservar: solo se ofrecen los huecos donde caben. */
     val durationMinutes: Int = DEFAULT_DURATION,
     val content: BookingContent = BookingContent.Loading,
-    val selectedSlot: SelectedSlot? = null
+    val sheet: ReservationSheet? = null
 )
 
 /** Lo habitual es reservar un partido de hora y media. */
 private const val DEFAULT_DURATION = 90
 
 @HiltViewModel
-class BookingViewModel @Inject constructor(private val repository: TimetableRepository) : ViewModel() {
+class BookingViewModel @Inject constructor(
+    private val repository: TimetableRepository,
+    private val reservationRepository: ReservationRepository
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow(initialState())
     val uiState: StateFlow<BookingUiState> = _uiState.asStateFlow()
@@ -65,31 +107,86 @@ class BookingViewModel @Inject constructor(private val repository: TimetableRepo
 
     fun onDaySelect(day: LocalDate) {
         if (day == _uiState.value.selectedDay) return
-        _uiState.update { it.copy(selectedDay = day, selectedSlot = null) }
+        _uiState.update { it.copy(selectedDay = day) }
         val cached = timetables[day]
         if (cached != null) showTimetable(cached) else load(day)
     }
 
     fun onDayPartSelect(dayPart: DayPart) {
-        _uiState.update { it.copy(dayPart = dayPart, selectedSlot = null) }
+        _uiState.update { it.copy(dayPart = dayPart) }
         timetables[_uiState.value.selectedDay]?.let(::showTimetable)
     }
 
     fun onDurationSelect(minutes: Int) {
-        _uiState.update { it.copy(durationMinutes = minutes, selectedSlot = null) }
+        _uiState.update { it.copy(durationMinutes = minutes) }
         timetables[_uiState.value.selectedDay]?.let(::showTimetable)
     }
 
     fun onSlotClick(courtId: Int, start: Instant) {
-        val slot = SelectedSlot(courtId, start)
-        _uiState.update { it.copy(selectedSlot = if (it.selectedSlot == slot) null else slot) }
+        _uiState.update { state ->
+            val courtSlots = (state.content as? BookingContent.Loaded)?.courts?.firstOrNull { it.court.id == courtId }
+            val slot = courtSlots?.slots?.firstOrNull { it.start == start && it.state == SlotState.Free }
+            if (courtSlots == null || slot == null) {
+                state
+            } else {
+                state.copy(sheet = ReservationSheet(courtSlots.court, slot, state.durationMinutes))
+            }
+        }
+    }
+
+    /** Aquí sí se reserva de verdad: pre-reserva y confirmación seguidas. Nunca se reintenta solo. */
+    fun onConfirmClick() {
+        val sheet = _uiState.value.sheet ?: return
+        if (sheet.status == ReservationStatus.Booking || sheet.status is ReservationStatus.Success) return
+        updateSheet { it.copy(status = ReservationStatus.Booking) }
+
+        viewModelScope.launch {
+            val status = when (
+                val result = reservationRepository.book(sheet.court.id, sheet.slot.start, sheet.durationMinutes)
+            ) {
+                is ReservationResult.Success -> ReservationStatus.Success(result.total)
+
+                ReservationResult.SlotUnavailable -> ReservationStatus.Failed(ReservationError.SlotUnavailable)
+
+                ReservationResult.NetworkError -> ReservationStatus.Failed(ReservationError.Network)
+
+                ReservationResult.Uncertain -> ReservationStatus.Failed(ReservationError.Uncertain)
+
+                ReservationResult.Incomplete -> ReservationStatus.Failed(ReservationError.Incomplete)
+
+                ReservationResult.UnknownError -> ReservationStatus.Failed(ReservationError.Unknown)
+
+                // La app ya está volviendo al login
+                ReservationResult.SessionExpired -> null
+            }
+            if (status == null) _uiState.update { it.copy(sheet = null) } else updateSheet { it.copy(status = status) }
+        }
+    }
+
+    /**
+     * Cerrar la hoja. Mientras se reserva no se puede. Si la parrilla ha podido cambiar (reserva hecha, hueco ya
+     * cogido o resultado dudoso), se recarga el día para ver el estado real.
+     */
+    fun onSheetDismiss() {
+        val sheet = _uiState.value.sheet ?: return
+        if (sheet.status == ReservationStatus.Booking) return
+        _uiState.update { it.copy(sheet = null) }
+        val gridMayHaveChanged = when (val status = sheet.status) {
+            is ReservationStatus.Success -> true
+            is ReservationStatus.Failed -> status.error != ReservationError.Network
+            else -> false
+        }
+        if (gridMayHaveChanged) onRefresh()
+    }
+
+    private fun updateSheet(transform: (ReservationSheet) -> ReservationSheet) {
+        _uiState.update { state -> state.copy(sheet = state.sheet?.let(transform)) }
     }
 
     /** Refrescar es volver a cargar: se ven las siluetas otra vez y, si falla, el error. */
     fun onRefresh() {
         val day = _uiState.value.selectedDay
         timetables.remove(day)
-        _uiState.update { it.copy(selectedSlot = null) }
         load(day)
     }
 

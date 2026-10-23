@@ -28,7 +28,9 @@ El CI (`.github/workflows/ci.yml`) ejecuta lo mismo en cada push a `main` y en c
   - `core/network/`: cliente HTTP y sesión. `ui/theme/`: tema.
   - `ui/components/`: componentes reutilizables entre pantallas (p. ej. `PillSwitch`, el selector de píldora de los mocks). Antes de crear uno nuevo, mirar si ya existe aquí.
 - **Backend**: no hay API propia; es la web de reservas del club (Syltek, `https://prat.syltek.com/`), replicada por ingeniería inversa. **Antes de tocar cualquier petición, leer `docs/syltek-api.md`**: rutas, formularios, selectores HTML y reglas (p. ej. la pre-reserva bloquea la pista 8 minutos, anular es un GET que no se puede reintentar).
-  - Respuestas en HTML y formularios `x-www-form-urlencoded`: OkHttp directo, sin Retrofit. Jsoup se añadirá cuando haga falta leer HTML.
+  - Respuestas en HTML y formularios `x-www-form-urlencoded`: OkHttp directo, sin Retrofit. El HTML se lee con Jsoup, en parsers aislados (`TimetableParser`, `ReservationParsers`).
+  - **Reservar** (`ReservationRepository.book`): pre-reserva, cambio de duración y confirmación seguidos, solo al pulsar "Confirmar reserva" en la hoja de la parrilla. Abrir la hoja no bloquea nada. Ningún paso se reintenta solo; si se corta al confirmar, el resultado es dudoso y se avisa. Ver `docs/plan-confirmar-reserva.md`.
+  - **Al probar en un móvil, no confirmar ni pre-reservar nunca una reserva real**: crea reservas de verdad y bloquea pistas a otros socios. Las pruebas de reserva las hace el usuario.
   - Sesión: solo una cookie (`Syltek.SESSION_COOKIE`, 6 meses) guardada cifrada con Tink en DataStore (`PersistentCookieJar`). **No se guarda la contraseña.** La sesión está excluida de las copias de seguridad (`res/xml`).
   - `followRedirects(false)`: un 303 a `/customer/login` significa sesión caducada; `SessionExpiredInterceptor` borra la sesión y la app vuelve al login.
   - Logs de red solo en debug y a nivel `BASIC` (método, URL y código). Nunca registrar cabeceras, cookies ni contraseñas.

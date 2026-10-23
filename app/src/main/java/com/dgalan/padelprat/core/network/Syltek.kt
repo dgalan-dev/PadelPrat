@@ -17,6 +17,14 @@ object Syltek {
     const val TIMETABLE_PATH = "customerzone/timetable"
     const val PADEL_RESOURCE_TYPE = "56"
 
+    /** Flujo de reserva: pre-reserva (bloquea 8 minutos), cambio de duración y confirmación. */
+    const val PRE_RESERVATION_PATH = "customerZone/newReservation"
+    const val UPDATE_DURATION_PATH = "customerzone/updateduration"
+    const val CONFIRM_RESERVATION_PATH = "customerZone/newReservationPost"
+
+    /** Tras confirmar, la web redirige aquí; si redirige a la parrilla es que el hueco ya no es válido. */
+    const val CONFIRMATION_PATH = "/booking/confirm"
+
     /** Página tras el login. */
     const val HOME_PATH = "/customerzone/index"
 
