@@ -6,10 +6,14 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -60,6 +64,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableStateSetOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.Saver
@@ -71,6 +76,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.LookaheadScope
@@ -496,9 +502,20 @@ private fun CourtCard(
     val freeSlots = courtSlots.slots.count { it.state == SlotState.Free }
     val slots = if (expanded) courtSlots.slots else courtSlots.slots.filter { it.state != SlotState.Unavailable }
     val toggleLabel = stringResource(if (expanded) R.string.booking_court_collapse else R.string.booking_court_expand)
-    CourtCardSurface(clickModifier = Modifier.clickable(onClickLabel = toggleLabel, onClick = onExpandToggle)) {
+    // Las horas solo se animan justo después de desplegar o plegar: la lista vuelve a componer las tarjetas al hacer
+    // scroll, y sin esto cada vez que una entraba en pantalla sus horas aparecían con fundido y deslizándose
+    var animateSlots by remember { mutableStateOf(false) }
+    LaunchedEffect(expanded) {
+        delay(SLOT_ANIMATION_WINDOW_MILLIS)
+        animateSlots = false
+    }
+    val onClick = {
+        animateSlots = true
+        onExpandToggle()
+    }
+    CourtCardSurface(clickModifier = Modifier.clickable(onClickLabel = toggleLabel, onClick = onClick)) {
         CourtHeader(court = court, freeSlots = freeSlots, expanded = expanded)
-        SlotGrid(slots) { slot, modifier ->
+        SlotGrid(slots, animate = animateSlots) { slot, modifier ->
             SlotChip(
                 slot = slot,
                 selected = selectedSlot == SelectedSlot(court.id, slot.start),
@@ -515,7 +532,7 @@ private fun CourtCard(
  * un fundido.
  */
 @Composable
-private fun SlotGrid(slots: List<Slot>, chip: @Composable (Slot, Modifier) -> Unit) {
+private fun SlotGrid(slots: List<Slot>, animate: Boolean, chip: @Composable (Slot, Modifier) -> Unit) {
     BoxWithConstraints {
         val gap = 6.dp
         // En píxeles enteros y redondeando hacia abajo: con decimales, las 3 podían pasarse un píxel y la tercera
@@ -531,12 +548,15 @@ private fun SlotGrid(slots: List<Slot>, chip: @Composable (Slot, Modifier) -> Un
             ) {
                 slots.forEach { slot ->
                     key(slot.start) {
-                        val alpha = remember { Animatable(0f) }
+                        val alpha = remember { Animatable(if (animate) 0f else 1f) }
                         LaunchedEffect(Unit) { alpha.animateTo(1f) }
                         chip(
                             slot,
                             Modifier
-                                .animateBounds(this@LookaheadScope)
+                                .animateBounds(
+                                    lookaheadScope = this@LookaheadScope,
+                                    boundsTransform = { _, _ -> if (animate) slotBoundsSpec else snap() }
+                                )
                                 .width(chipWidth)
                                 .graphicsLayer { this.alpha = alpha.value }
                         )
@@ -657,6 +677,12 @@ internal fun freeColors() = MaterialTheme.colorScheme.let { scheme ->
 }
 
 private const val SLOT_COLUMNS = 3
+
+/** Margen tras desplegar o plegar en el que las horas se animan; cubre el inicio de sus animaciones. */
+private const val SLOT_ANIMATION_WINDOW_MILLIS = 600L
+
+private val slotBoundsSpec =
+    spring(stiffness = Spring.StiffnessMediumLow, visibilityThreshold = Rect.VisibilityThreshold)
 private val TIME_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
 
 @Composable
