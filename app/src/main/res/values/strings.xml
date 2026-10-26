@@ -147,6 +147,17 @@
     <string name="profile_version">Versión %1$s</string>
     <string name="profile_error_network">No hay conexión. Revisa tu internet y vuelve a intentarlo.</string>
     <string name="profile_error_unknown">No se han podido cargar tus datos. Vuelve a intentarlo más tarde.</string>
+    <string name="update_title">Nueva versión disponible</string>
+    <!-- "Ya está disponible la versión 1.1.0 (tienes la 1.0.0). Para seguir usando la app, actualízala." -->
+    <string name="update_text">Ya está disponible la versión %1$s (tienes la %2$s). Para seguir usando la app, actualízala.</string>
+    <string name="update_button">Actualizar</string>
+    <string name="update_permission_hint">Android te pedirá permitir que Padel Prat instale aplicaciones. Solo se usa para instalar sus propias actualizaciones.</string>
+    <string name="update_waiting_scheduled">Se está haciendo una reserva programada. Podrás actualizar cuando termine.</string>
+    <!-- "Descargando… 42 %" -->
+    <string name="update_downloading">Descargando… %1$d %%</string>
+    <string name="update_installing">Instalando…</string>
+    <string name="update_error_download">No se ha podido descargar la actualización. Revisa tu conexión y vuelve a intentarlo.</string>
+    <string name="update_error_install">No se ha podido instalar la actualización. Vuelve a intentarlo.</string>
     <!-- Saludo encima de "Reserva tu pista", como en el mock -->
     <string name="booking_greeting">Hola, %1$s</string>
 </resources>

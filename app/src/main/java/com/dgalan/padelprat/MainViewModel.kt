@@ -4,10 +4,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dgalan.padelprat.data.auth.AuthRepository
 import com.dgalan.padelprat.data.scheduled.ScheduledBookingRescheduler
+import com.dgalan.padelprat.data.update.AppUpdate
+import com.dgalan.padelprat.data.update.UpdateRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -21,9 +24,22 @@ sealed interface SessionState {
     data object LoggedOut : SessionState
 }
 
+sealed interface UpdateState {
+    /** Mirando si hay versión nueva; mientras tanto se mantiene la pantalla de arranque. */
+    data object Checking : UpdateState
+
+    data object UpToDate : UpdateState
+
+    /** Hay una versión nueva: la app no se puede usar hasta instalarla. */
+    data class Required(val update: AppUpdate) : UpdateState
+}
+
 @HiltViewModel
-class MainViewModel @Inject constructor(authRepository: AuthRepository, rescheduler: ScheduledBookingRescheduler) :
-    ViewModel() {
+class MainViewModel @Inject constructor(
+    authRepository: AuthRepository,
+    rescheduler: ScheduledBookingRescheduler,
+    updateRepository: UpdateRepository
+) : ViewModel() {
 
     init {
         // Al abrir la app se ponen al día las alarmas: cubre que Android las haya borrado (p. ej. al forzar la detención)
@@ -33,4 +49,8 @@ class MainViewModel @Inject constructor(authRepository: AuthRepository, reschedu
     val sessionState: StateFlow<SessionState> = authRepository.isLoggedIn
         .map { loggedIn -> if (loggedIn) SessionState.LoggedIn else SessionState.LoggedOut }
         .stateIn(viewModelScope, SharingStarted.Eagerly, SessionState.Loading)
+
+    val updateState: StateFlow<UpdateState> = flow {
+        emit(updateRepository.check()?.let { UpdateState.Required(it) } ?: UpdateState.UpToDate)
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, UpdateState.Checking)
 }
