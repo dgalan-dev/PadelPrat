@@ -21,6 +21,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -42,10 +43,20 @@ import com.dgalan.padelprat.feature.reservations.ReservationsScreen
  *
  * Cada pestaña conserva su estado al cambiar de una a otra. Atrás desde otra pestaña vuelve a la de inicio, y desde
  * la de inicio sale de la app.
+ *
+ * Cada vez que sube [openReservationsRequests] (al tocar un aviso) se pasa a Mis reservas.
  */
 @Composable
-fun MainScaffold(modifier: Modifier = Modifier) {
+fun MainScaffold(openReservationsRequests: Int, modifier: Modifier = Modifier) {
     var selected by rememberSaveable { mutableStateOf(TopLevelDestination.entries.first()) }
+    // Cada petición se atiende una vez, también tras recrearse la pantalla
+    var handledRequests by rememberSaveable { mutableIntStateOf(0) }
+    LaunchedEffect(openReservationsRequests) {
+        if (openReservationsRequests > handledRequests) {
+            handledRequests = openReservationsRequests
+            selected = TopLevelDestination.Reservations
+        }
+    }
     val stateHolder = rememberSaveableStateHolder()
     val haptics = LocalHapticFeedback.current
     StartupPermissions()

@@ -1,6 +1,7 @@
 package com.dgalan.padelprat.data.reservations
 
 import com.dgalan.padelprat.core.network.Syltek
+import com.dgalan.padelprat.data.reminders.ReminderRepository
 import java.time.LocalDateTime
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -38,10 +39,23 @@ sealed interface CancelResult {
     data object SessionExpired : CancelResult
 }
 
+/** Si una reserva sigue activa, para los avisos. */
+sealed interface ReservationCheck {
+    /** Sigue reservada; [court] es la pista que tiene ahora, si se ha podido leer. */
+    data class Active(val court: ReservationCourt?) : ReservationCheck
+
+    /** El listado la da como anulada. */
+    data object Cancelled : ReservationCheck
+
+    /** Sin conexión, o no aparece en el listado (p. ej. si la web cambia y no se lee bien). */
+    data object Unknown : ReservationCheck
+}
+
 @Singleton
 class ReservationsRepository @Inject constructor(
     private val remote: ReservationsRemoteDataSource,
-    private val changeNotifier: ReservationsChangeNotifier
+    private val changeNotifier: ReservationsChangeNotifier,
+    private val reminders: ReminderRepository
 ) {
 
     private val cancelMutex = Mutex()
@@ -56,7 +70,15 @@ class ReservationsRepository @Inject constructor(
 
     /** Actualiza solo el contador, con el listado y sin pedir el detalle de cada reserva. */
     suspend fun refreshActiveCount() {
-        (remote.list() as? ReservationsStep.Ok)?.let { updateActiveCount(it.value) }
+        list()
+    }
+
+    /** El listado de la web. Cada vez que llega se actualizan el contador de activas y los avisos. */
+    private suspend fun list(): ReservationsStep<List<Reservation>> = remote.list().also { step ->
+        if (step is ReservationsStep.Ok) {
+            updateActiveCount(step.value)
+            reminders.sync(step.value)
+        }
     }
 
     private fun updateActiveCount(reservations: List<Reservation>) {
@@ -69,16 +91,10 @@ class ReservationsRepository @Inject constructor(
      * (una petición por reserva: suelen ser pocas). Las pasadas y anuladas se dejan sin pista para no lanzar decenas
      * de peticiones.
      */
-    suspend fun reservations(): ReservationsResult = when (val step = remote.list()) {
-        is ReservationsStep.Ok -> {
-            updateActiveCount(step.value)
-            ReservationsResult.Success(withCourts(step.value))
-        }
-
+    suspend fun reservations(): ReservationsResult = when (val step = list()) {
+        is ReservationsStep.Ok -> ReservationsResult.Success(withCourts(step.value))
         ReservationsStep.NetworkError -> ReservationsResult.NetworkError
-
         ReservationsStep.SessionExpired -> ReservationsResult.SessionExpired
-
         ReservationsStep.UnknownError -> ReservationsResult.UnknownError
     }
 
@@ -100,13 +116,22 @@ class ReservationsRepository @Inject constructor(
      * el listado puede tardar en mostrarla.
      */
     suspend fun bookedCourt(start: LocalDateTime, durationMinutes: Int): ReservationCourt? {
-        val list = remote.list() as? ReservationsStep.Ok ?: return null
-        updateActiveCount(list.value)
+        val list = list() as? ReservationsStep.Ok ?: return null
         val reservation = list.value.firstOrNull {
             it.upcoming && it.status == ReservationStatus.Booked && it.start == start &&
                 it.durationMinutes == durationMinutes
         } ?: return null
         return remote.court(reservation.id)
+    }
+
+    /** Para los avisos: si la reserva sigue activa y en qué pista. Solo lee. */
+    suspend fun check(id: Long): ReservationCheck {
+        val list = list() as? ReservationsStep.Ok ?: return ReservationCheck.Unknown
+        return when (list.value.firstOrNull { it.id == id }?.status) {
+            ReservationStatus.Booked -> ReservationCheck.Active(remote.court(id))
+            ReservationStatus.Cancelled -> ReservationCheck.Cancelled
+            else -> ReservationCheck.Unknown
+        }
     }
 
     /**
@@ -117,8 +142,8 @@ class ReservationsRepository @Inject constructor(
         val sent = remote.cancel(id)
         if (sent == ReservationsStep.SessionExpired) return CancelResult.SessionExpired
         // Aunque falle la red, la petición ha podido llegar: siempre se comprueba en el listado
-        val result = when (val list = remote.list()) {
-            is ReservationsStep.Ok -> when (list.value.also(::updateActiveCount).firstOrNull { it.id == id }?.status) {
+        val result = when (val list = list()) {
+            is ReservationsStep.Ok -> when (list.value.firstOrNull { it.id == id }?.status) {
                 ReservationStatus.Cancelled -> CancelResult.Cancelled
                 ReservationStatus.Booked -> CancelResult.NotCancelled
                 else -> CancelResult.Uncertain

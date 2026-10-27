@@ -9,6 +9,7 @@ import android.os.IBinder
 import android.os.PowerManager
 import androidx.core.app.ServiceCompat
 import com.dgalan.padelprat.data.reservations.ReservationsChangeNotifier
+import com.dgalan.padelprat.data.reservations.ReservationsRepository
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import kotlin.coroutines.cancellation.CancellationException
@@ -37,6 +38,8 @@ class ScheduledBookingService : Service() {
     @Inject lateinit var changeNotifier: ReservationsChangeNotifier
 
     @Inject lateinit var registry: ScheduledRunRegistry
+
+    @Inject lateinit var reservationsRepository: ReservationsRepository
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var running = 0
@@ -90,6 +93,8 @@ class ScheduledBookingService : Service() {
                 if (!dryRun) {
                     repository.remove(booking.id)
                     changeNotifier.notifyChanged()
+                    // Lee el listado para poner ya los avisos de la reserva nueva, aunque no se abra la app
+                    if (run.result is ScheduledRunResult.Booked) reservationsRepository.refreshActiveCount()
                 }
             } finally {
                 // En el hilo principal, como onStartCommand: así el contador no se pisa y no se para el servicio justo

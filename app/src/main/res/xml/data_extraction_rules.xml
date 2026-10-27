@@ -1,15 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
    Copias de seguridad y transferencia entre móviles en Android 12 y posteriores.
-   La sesión (cookies cifradas y su clave) no se copia: ver backup_rules.xml.
+   La sesión (cookies cifradas y su clave) y los avisos de las reservas no se copian: ver backup_rules.xml.
 -->
 <data-extraction-rules>
     <cloud-backup>
         <exclude domain="file" path="datastore/session_cookies.bin" />
         <exclude domain="sharedpref" path="session_keyset_prefs.xml" />
+        <exclude domain="file" path="datastore/reminders.json" />
     </cloud-backup>
     <device-transfer>
         <exclude domain="file" path="datastore/session_cookies.bin" />
         <exclude domain="sharedpref" path="session_keyset_prefs.xml" />
+        <exclude domain="file" path="datastore/reminders.json" />
     </device-transfer>
 </data-extraction-rules>

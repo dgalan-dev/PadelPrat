@@ -6,6 +6,7 @@ import com.dgalan.padelprat.data.auth.AuthRepository
 import com.dgalan.padelprat.data.profile.Profile
 import com.dgalan.padelprat.data.profile.ProfileRepository
 import com.dgalan.padelprat.data.profile.ProfileResult
+import com.dgalan.padelprat.data.reminders.ReminderRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,13 +21,17 @@ data class ProfileUiState(
     val profile: Profile? = null,
     val isLoading: Boolean = true,
     /** Solo se muestra si no hay datos que enseñar; si ya había, se siguen viendo. */
-    val error: ProfileError? = null
+    val error: ProfileError? = null,
+    /** Avisos activados: 3 h antes del partido y el día anterior para anular sin cargos. */
+    val matchReminders: Boolean = true,
+    val cancelReminders: Boolean = true
 )
 
 @HiltViewModel
 class ProfileViewModel @Inject constructor(
     private val authRepository: AuthRepository,
-    private val profileRepository: ProfileRepository
+    private val profileRepository: ProfileRepository,
+    private val reminderRepository: ReminderRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ProfileUiState(profile = profileRepository.profile.value))
@@ -36,10 +41,23 @@ class ProfileViewModel @Inject constructor(
         viewModelScope.launch {
             profileRepository.profile.collect { profile -> _uiState.update { it.copy(profile = profile) } }
         }
+        viewModelScope.launch {
+            reminderRepository.state.collect { state ->
+                _uiState.update { it.copy(matchReminders = state.matchEnabled, cancelReminders = state.cancelEnabled) }
+            }
+        }
         refresh()
     }
 
     fun onRetry() = refresh()
+
+    fun onMatchRemindersChange(enabled: Boolean) {
+        viewModelScope.launch { reminderRepository.setMatchEnabled(enabled) }
+    }
+
+    fun onCancelRemindersChange(enabled: Boolean) {
+        viewModelScope.launch { reminderRepository.setCancelEnabled(enabled) }
+    }
 
     /** Al borrarse la sesión, la navegación raíz vuelve sola al login. */
     fun onLogoutClick() {

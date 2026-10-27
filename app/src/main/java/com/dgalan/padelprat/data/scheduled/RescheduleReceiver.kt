@@ -3,6 +3,7 @@ package com.dgalan.padelprat.data.scheduled
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import com.dgalan.padelprat.data.reminders.ReminderRepository
 import com.dgalan.padelprat.data.update.UpdateRepository
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
@@ -13,7 +14,7 @@ import kotlinx.coroutines.launch
 /**
  * Vuelve a poner las alarmas de las reservas programadas cuando Android las ha podido perder o desajustar: al
  * reiniciar el móvil, al actualizar la app, al cambiar la hora o la zona horaria y al conceder el permiso de alarmas
- * exactas (ver [ScheduledBookingRescheduler]). Tras actualizar la app, también borra el APK descargado para instalarla,
+ * exactas (ver [ScheduledBookingRescheduler]), y las de los avisos ([ReminderRepository.reschedule]). Tras actualizar la app, también borra el APK descargado para instalarla,
  * sin esperar a que se abra.
  */
 @AndroidEntryPoint
@@ -23,6 +24,8 @@ class RescheduleReceiver : BroadcastReceiver() {
 
     @Inject lateinit var updateRepository: UpdateRepository
 
+    @Inject lateinit var reminderRepository: ReminderRepository
+
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action !in ACTIONS) return
         val pending = goAsync()
@@ -30,6 +33,7 @@ class RescheduleReceiver : BroadcastReceiver() {
             try {
                 if (intent.action == Intent.ACTION_MY_PACKAGE_REPLACED) updateRepository.deleteDownloads()
                 rescheduler.reconcile()
+                reminderRepository.reschedule()
             } finally {
                 pending.finish()
             }

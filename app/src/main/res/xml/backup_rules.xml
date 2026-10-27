@@ -3,8 +3,10 @@
    Copias de seguridad en Android 11 y anteriores.
    La sesión (cookies cifradas y su clave) no se copia: la clave maestra vive en el Keystore del móvil y no viaja
    con la copia, así que en otro móvil no se podría descifrar.
+   Los avisos de las reservas tampoco: se rehacen solos al leer Mis reservas.
 -->
 <full-backup-content>
     <exclude domain="file" path="datastore/session_cookies.bin" />
     <exclude domain="sharedpref" path="session_keyset_prefs.xml" />
+    <exclude domain="file" path="datastore/reminders.json" />
 </full-backup-content>

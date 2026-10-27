@@ -1,5 +1,7 @@
 package com.dgalan.padelprat
 
+import android.content.Context
+import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -7,6 +9,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dgalan.padelprat.feature.update.ForceUpdateScreen
@@ -22,9 +25,14 @@ class MainActivity : ComponentActivity() {
 
     private val viewModel: MainViewModel by viewModels()
 
+    /** Sube cada vez que se pide abrir Mis reservas (al tocar un aviso). */
+    private val openReservationsRequests = mutableIntStateOf(0)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
+        // Al recrearse la actividad no se repite: la pestaña ya se conserva sola
+        if (savedInstanceState == null) handleIntent(intent)
         // La pantalla de arranque se mantiene hasta saber si hay sesión, para no enseñar el login un instante, y si hay
         // una versión nueva obligatoria, para no enseñar la app y quitarla enseguida
         splashScreen.setKeepOnScreenCondition {
@@ -57,9 +65,30 @@ class MainActivity : ComponentActivity() {
                     )
 
                     sessionState != SessionState.Loading && updateState == UpdateState.UpToDate ->
-                        AppNavigation(isLoggedIn = sessionState == SessionState.LoggedIn)
+                        AppNavigation(
+                            isLoggedIn = sessionState == SessionState.LoggedIn,
+                            openReservationsRequests = openReservationsRequests.intValue
+                        )
                 }
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleIntent(intent)
+    }
+
+    private fun handleIntent(intent: Intent?) {
+        if (intent?.getBooleanExtra(EXTRA_OPEN_RESERVATIONS, false) == true) openReservationsRequests.intValue++
+    }
+
+    companion object {
+        private const val EXTRA_OPEN_RESERVATIONS = "openReservations"
+
+        /** Abre la app en Mis reservas, o la trae delante si ya estaba abierta. */
+        fun openReservationsIntent(context: Context): Intent = Intent(context, MainActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            .putExtra(EXTRA_OPEN_RESERVATIONS, true)
     }
 }

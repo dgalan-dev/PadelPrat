@@ -24,6 +24,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -54,6 +55,8 @@ fun ProfileScreen(modifier: Modifier = Modifier, viewModel: ProfileViewModel = h
     ProfileContent(
         uiState = uiState,
         onRetry = viewModel::onRetry,
+        onMatchRemindersChange = viewModel::onMatchRemindersChange,
+        onCancelRemindersChange = viewModel::onCancelRemindersChange,
         onLogoutClick = viewModel::onLogoutClick,
         modifier = modifier
     )
@@ -64,6 +67,8 @@ fun ProfileScreen(modifier: Modifier = Modifier, viewModel: ProfileViewModel = h
 private fun ProfileContent(
     uiState: ProfileUiState,
     onRetry: () -> Unit,
+    onMatchRemindersChange: (Boolean) -> Unit,
+    onCancelRemindersChange: (Boolean) -> Unit,
     onLogoutClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -92,6 +97,14 @@ private fun ProfileContent(
 
             uiState.error != null -> ProfileError(uiState.error, onRetry)
         }
+
+        Spacer(Modifier.height(24.dp))
+        Reminders(
+            matchReminders = uiState.matchReminders,
+            cancelReminders = uiState.cancelReminders,
+            onMatchRemindersChange = onMatchRemindersChange,
+            onCancelRemindersChange = onCancelRemindersChange
+        )
 
         Spacer(Modifier.height(32.dp))
         // Secundario: no es lo que se viene a hacer aquí, y se confirma antes
@@ -208,6 +221,56 @@ private fun ProfileDetails(profile: Profile) {
     }
 }
 
+/** Los avisos de las próximas reservas, que se pueden desactivar por separado. */
+@Composable
+private fun Reminders(
+    matchReminders: Boolean,
+    cancelReminders: Boolean,
+    onMatchRemindersChange: (Boolean) -> Unit,
+    onCancelRemindersChange: (Boolean) -> Unit
+) {
+    Column {
+        Text(
+            text = stringResource(R.string.profile_reminders),
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(8.dp))
+        PadelCard {
+            Column {
+                SwitchRow(
+                    title = stringResource(R.string.profile_reminder_match),
+                    text = stringResource(R.string.profile_reminder_match_text),
+                    checked = matchReminders,
+                    onCheckedChange = onMatchRemindersChange
+                )
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                SwitchRow(
+                    title = stringResource(R.string.profile_reminder_cancel),
+                    text = stringResource(R.string.profile_reminder_cancel_text),
+                    checked = cancelReminders,
+                    onCheckedChange = onCancelRemindersChange
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SwitchRow(title: String, text: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
+            Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
+    }
+}
+
 @Composable
 private fun InfoRow(icon: Int, label: String, value: String) {
     Row(
@@ -256,6 +319,8 @@ private fun ProfileContentPreview() {
                 isLoading = false
             ),
             onRetry = {},
+            onMatchRemindersChange = {},
+            onCancelRemindersChange = {},
             onLogoutClick = {}
         )
     }

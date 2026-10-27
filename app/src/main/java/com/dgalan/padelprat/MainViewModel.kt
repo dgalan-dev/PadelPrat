@@ -3,6 +3,7 @@ package com.dgalan.padelprat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dgalan.padelprat.data.auth.AuthRepository
+import com.dgalan.padelprat.data.reminders.ReminderRepository
 import com.dgalan.padelprat.data.scheduled.ScheduledBookingRescheduler
 import com.dgalan.padelprat.data.update.AppUpdate
 import com.dgalan.padelprat.data.update.UpdateRepository
@@ -38,12 +39,14 @@ sealed interface UpdateState {
 class MainViewModel @Inject constructor(
     authRepository: AuthRepository,
     rescheduler: ScheduledBookingRescheduler,
+    reminderRepository: ReminderRepository,
     updateRepository: UpdateRepository
 ) : ViewModel() {
 
     init {
         // Al abrir la app se ponen al día las alarmas: cubre que Android las haya borrado (p. ej. al forzar la detención)
         viewModelScope.launch { rescheduler.reconcile() }
+        viewModelScope.launch { reminderRepository.reschedule() }
     }
 
     val sessionState: StateFlow<SessionState> = authRepository.isLoggedIn

@@ -13,9 +13,11 @@ import com.dgalan.padelprat.feature.login.LoginScreen
 /**
  * La sesión decide la pantalla raíz: al iniciar sesión se pasa a la principal (con la barra inferior) y al cerrarla
  * (o al caducar) se vuelve al login, vaciando la pila para que no se pueda volver atrás.
+ *
+ * [openReservationsRequests] sube cada vez que hay que ir a Mis reservas (al tocar un aviso).
  */
 @Composable
-fun AppNavigation(isLoggedIn: Boolean, modifier: Modifier = Modifier) {
+fun AppNavigation(isLoggedIn: Boolean, openReservationsRequests: Int, modifier: Modifier = Modifier) {
     val root = if (isLoggedIn) MainRoute else LoginRoute
     val backStack = rememberNavBackStack(root)
 
@@ -36,7 +38,7 @@ fun AppNavigation(isLoggedIn: Boolean, modifier: Modifier = Modifier) {
         ),
         entryProvider = entryProvider {
             entry<LoginRoute> { LoginScreen() }
-            entry<MainRoute> { MainScaffold() }
+            entry<MainRoute> { MainScaffold(openReservationsRequests) }
         }
     )
 }

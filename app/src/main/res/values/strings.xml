@@ -69,6 +69,13 @@
     <string name="schedule_battery_fix">Quitar restricción</string>
     <string name="notification_channel_running">Reserva programada en curso</string>
     <string name="notification_channel_result">Resultado de las reservas programadas</string>
+    <string name="notification_channel_reminders">Avisos de las reservas</string>
+    <string name="reminder_match_title">🎾 Hoy juegas a las %1$s</string>
+    <string name="reminder_hours">%1$s – %2$s</string>
+    <string name="reminder_court_sponsor">%1$s · %2$s</string>
+    <string name="reminder_cancel_title">Mañana juegas a las %1$s</string>
+    <string name="reminder_cancel_morning_text">Hoy es el último día para anularla sin cargos.</string>
+    <string name="reminder_cancel_evening_text">Si no vais a jugar, anúlala antes de las 23:59 para que no tenga cargos.</string>
     <string name="notification_running_title">Reserva programada</string>
     <string name="notification_running_test_title">Prueba de reserva programada</string>
     <!-- "Esperando a que abra el sábado 31 de octubre…" -->
@@ -168,6 +175,11 @@
     <string name="profile_edit_hint">Para cambiar tus datos, entra en la web del club.</string>
     <string name="profile_version">Versión %1$s</string>
     <string name="profile_error_unknown">No se han podido cargar tus datos</string>
+    <string name="profile_reminders">Avisos</string>
+    <string name="profile_reminder_match">Recordatorio del partido</string>
+    <string name="profile_reminder_match_text">3 horas antes de empezar</string>
+    <string name="profile_reminder_cancel">Último día para anular</string>
+    <string name="profile_reminder_cancel_text">El día anterior a las 10:00 y a las 21:00, mientras aún se puede anular sin cargos</string>
     <string name="update_title">Nueva versión disponible</string>
     <!-- "Ya está disponible la versión 1.1.0 (tienes la 1.0.0). Para seguir usando la app, actualízala." -->
     <string name="update_text">Ya está disponible la versión %1$s (tienes la %2$s). Para seguir usando la app, actualízala.</string>
