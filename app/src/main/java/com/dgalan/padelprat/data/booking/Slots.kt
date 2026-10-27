@@ -25,19 +25,28 @@ enum class SlotState {
     Free,
 
     /** Ocupado por otra reserva, o libre pero sin tiempo suficiente para reservar. */
-    Unavailable,
-
-    /** Dentro de una reserva del propio usuario. */
-    Mine
+    Unavailable
 }
 
 /** Un inicio posible en una pista. [start] es el instante real; [time], la hora local del club que se muestra. */
 data class Slot(val start: Instant, val time: LocalTime, val state: SlotState, val maxMinutes: Int)
 
-data class CourtSlots(val court: Court, val slots: List<Slot>)
+/**
+ * Una reserva del propio usuario, que se enseña entera en lugar de como huecos de media hora. [time] y [endTime] son
+ * la hora local del club.
+ */
+data class MyBooking(val court: Court, val start: Instant, val time: LocalTime, val endTime: LocalTime)
 
-/** Una hora de inicio con las pistas que se pueden reservar (o ya son del usuario) a esa hora. */
-data class TimeSlots(val time: LocalTime, val start: Instant, val courts: List<CourtAtTime>)
+/** [slots] no incluye los inicios que caen dentro de [mine]. */
+data class CourtSlots(val court: Court, val slots: List<Slot>, val mine: List<MyBooking> = emptyList())
+
+/** Una hora de inicio con las pistas que se pueden reservar a esa hora y las reservas propias que empiezan entonces. */
+data class TimeSlots(
+    val time: LocalTime,
+    val start: Instant,
+    val courts: List<CourtAtTime>,
+    val mine: List<MyBooking> = emptyList()
+)
 
 data class CourtAtTime(val court: Court, val state: SlotState)
 
@@ -47,28 +56,36 @@ val BOOKING_DURATIONS = listOf(90, 60)
 /**
  * Calcula los huecos de cada pista a partir de la parrilla (ver docs/syltek-api.md, apartado 4.6): recorre sus
  * tramos en pasos de `interval` minutos y marca cada inicio como libre, ocupado o propio. Se omiten los inicios que
- * ya han pasado y los posteriores al límite de reserva.
+ * ya han pasado y los posteriores al límite de reserva. Las reservas propias van aparte, en [CourtSlots.mine].
  */
 object SlotCalculator {
 
     /** [durationMinutes]: un hueco solo es libre si caben esos minutos hasta la siguiente reserva o el cierre. */
     fun slots(timetable: DayTimetable, durationMinutes: Int): List<CourtSlots> = timetable.courts.map { court ->
-        CourtSlots(court, courtSlots(court, timetable, durationMinutes))
+        CourtSlots(court, courtSlots(court, timetable, durationMinutes), myBookings(court, timetable))
     }
 
     /**
-     * Las mismas pistas agrupadas por hora, para la vista "por hora": solo las horas con alguna pista libre o propia,
-     * y en cada una esas pistas, en el orden de la parrilla.
+     * Las mismas pistas agrupadas por hora, para la vista "por hora": solo las horas con alguna pista libre o en las
+     * que empieza una reserva propia, y en cada una esas pistas, en el orden de la parrilla.
      */
-    fun byTime(courts: List<CourtSlots>): List<TimeSlots> = courts
-        .flatMap { courtSlots ->
-            courtSlots.slots
-                .filter { it.state == SlotState.Free || it.state == SlotState.Mine }
-                .map { slot -> slot to CourtAtTime(courtSlots.court, slot.state) }
-        }
-        .groupBy { (slot, _) -> slot.start }
-        .map { (start, pairs) -> TimeSlots(pairs.first().first.time, start, pairs.map { (_, court) -> court }) }
-        .sortedBy { it.start }
+    fun byTime(courts: List<CourtSlots>): List<TimeSlots> {
+        val free = courts
+            .flatMap { courtSlots ->
+                courtSlots.slots
+                    .filter { it.state == SlotState.Free }
+                    .map { slot -> slot to CourtAtTime(courtSlots.court, slot.state) }
+            }
+            .groupBy({ (slot, _) -> slot.start }, { (_, court) -> court })
+        val times = courts.flatMap { it.slots }.associate { it.start to it.time }
+        val mine = courts.flatMap { it.mine }.groupBy { it.start }
+        return (free.keys + mine.keys)
+            .map { start ->
+                val time = times[start] ?: mine.getValue(start).first().time
+                TimeSlots(time, start, free[start].orEmpty(), mine[start].orEmpty())
+            }
+            .sortedBy { it.start }
+    }
 
     private fun courtSlots(court: Court, timetable: DayTimetable, durationMinutes: Int): List<Slot> {
         val bookings = timetable.bookings.filter { it.courtId == court.id }.sortedBy { it.start }
@@ -80,19 +97,37 @@ object SlotCalculator {
             .sorted()
             .map { time -> time to timetable.instantAt(time) }
             .filter { (_, start) -> start >= timetable.now && start <= timetable.maxAvailability }
-            .map { (time, start) ->
+            .mapNotNull { (time, start) ->
                 val booking = bookings.firstOrNull { start >= it.start && start < it.end }
-                if (booking != null) {
-                    val mine = booking.customerId == timetable.customerId
-                    Slot(start, time, if (mine) SlotState.Mine else SlotState.Unavailable, maxMinutes = 0)
-                } else {
-                    val nextBusy = bookings.firstOrNull { it.start > start }?.start?.coerceAtMost(closing) ?: closing
-                    val minutes = Duration.between(start, nextBusy).toMinutes().toInt()
-                    val state = if (minutes >= durationMinutes) SlotState.Free else SlotState.Unavailable
-                    Slot(start, time, state, maxMinutes = minutes)
+                when {
+                    // Los inicios dentro de una reserva propia no salen: la reserva se enseña entera
+                    booking?.customerId == timetable.customerId -> null
+
+                    booking != null -> Slot(start, time, SlotState.Unavailable, maxMinutes = 0)
+
+                    else -> {
+                        val nextBusy =
+                            bookings.firstOrNull { it.start > start }?.start?.coerceAtMost(closing) ?: closing
+                        val minutes = Duration.between(start, nextBusy).toMinutes().toInt()
+                        val state = if (minutes >= durationMinutes) SlotState.Free else SlotState.Unavailable
+                        Slot(start, time, state, maxMinutes = minutes)
+                    }
                 }
             }
     }
+
+    /** Las que aún no han acabado; una ya empezada sigue saliendo con su hora de inicio. */
+    private fun myBookings(court: Court, timetable: DayTimetable): List<MyBooking> = timetable.bookings
+        .filter { it.courtId == court.id && it.customerId == timetable.customerId && it.end > timetable.now }
+        .sortedBy { it.start }
+        .map { booking ->
+            MyBooking(
+                court = court,
+                start = booking.start,
+                time = booking.start.atZone(Syltek.ZONE).toLocalTime(),
+                endTime = booking.end.atZone(Syltek.ZONE).toLocalTime()
+            )
+        }
 
     private fun Period.starts(): List<LocalTime> = generateSequence(start) { it.plusMinutes(intervalMinutes.toLong()) }
         // Un inicio justo en el final del tramo no sirve. Un tramo que acaba a medianoche (00:00) llega hasta el

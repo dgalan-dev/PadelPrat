@@ -28,7 +28,8 @@
     <string name="booking_uncovered">Descubierta</string>
     <string name="booking_slot_free">%1$s, libre</string>
     <string name="booking_slot_unavailable">%1$s, no disponible</string>
-    <string name="booking_slot_mine">%1$s, tu reserva</string>
+    <string name="booking_mine">Tu reserva · %1$s – %2$s</string>
+    <string name="booking_mine_court">Tu reserva · %1$s · %2$s – %3$s</string>
     <string name="booking_duration">%1$d min</string>
     <string name="booking_empty_morning">No quedan pistas libres de %1$d min por la mañana</string>
     <string name="booking_empty_afternoon">No quedan pistas libres de %1$d min por la tarde</string>

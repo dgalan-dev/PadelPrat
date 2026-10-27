@@ -389,8 +389,13 @@ class BookingViewModel @Inject constructor(
         _uiState.update { state ->
             if (timetable.date != state.selectedDay) return@update state
             val courts = SlotCalculator.slots(timetable, state.durationMinutes)
-                .map { court -> court.copy(slots = court.slots.filter { DayPart.of(it.time) == state.dayPart }) }
-                .filter { court -> court.slots.any { it.state == SlotState.Free || it.state == SlotState.Mine } }
+                .map { court ->
+                    court.copy(
+                        slots = court.slots.filter { DayPart.of(it.time) == state.dayPart },
+                        mine = court.mine.filter { DayPart.of(it.time) == state.dayPart }
+                    )
+                }
+                .filter { court -> court.slots.any { it.state == SlotState.Free } || court.mine.isNotEmpty() }
             state.copy(content = BookingContent.Loaded(courts, SlotCalculator.byTime(courts)))
         }
     }

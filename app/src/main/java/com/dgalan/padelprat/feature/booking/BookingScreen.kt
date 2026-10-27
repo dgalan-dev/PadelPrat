@@ -12,6 +12,7 @@ import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -99,6 +100,7 @@ import com.dgalan.padelprat.data.booking.Court
 import com.dgalan.padelprat.data.booking.CourtAtTime
 import com.dgalan.padelprat.data.booking.CourtSlots
 import com.dgalan.padelprat.data.booking.DayPart
+import com.dgalan.padelprat.data.booking.MyBooking
 import com.dgalan.padelprat.data.booking.Slot
 import com.dgalan.padelprat.data.booking.SlotCalculator
 import com.dgalan.padelprat.data.booking.SlotState
@@ -294,7 +296,8 @@ private fun BookingContent(
                             times = content.times,
                             selectedSlot = uiState.sheet?.selectedSlot,
                             entranceOpen = entranceOpen,
-                            onSlotClick = onSlotClick
+                            onSlotClick = onSlotClick,
+                            onMineClick = onReservationsClick
                         )
                     } else {
                         courtItems(
@@ -302,7 +305,8 @@ private fun BookingContent(
                             selectedSlot = uiState.sheet?.selectedSlot,
                             entranceOpen = entranceOpen,
                             expandedCourts = expandedCourts,
-                            onSlotClick = onSlotClick
+                            onSlotClick = onSlotClick,
+                            onMineClick = onReservationsClick
                         )
                     }
 
@@ -395,7 +399,8 @@ private fun LazyListScope.courtItems(
     selectedSlot: SelectedSlot?,
     entranceOpen: Boolean,
     expandedCourts: MutableSet<Int>,
-    onSlotClick: (courtId: Int, start: Instant) -> Unit
+    onSlotClick: (courtId: Int, start: Instant) -> Unit,
+    onMineClick: () -> Unit
 ) {
     itemsIndexed(courts, key = { _, courtSlots -> courtSlots.court.id }) { index, courtSlots ->
         // Tras las siluetas la lista siempre está arriba, así que el índice es también el orden en pantalla
@@ -412,7 +417,8 @@ private fun LazyListScope.courtItems(
                 selectedSlot = selectedSlot,
                 expanded = courtId in expandedCourts,
                 onExpandToggle = { if (!expandedCourts.remove(courtId)) expandedCourts.add(courtId) },
-                onSlotClick = onSlotClick
+                onSlotClick = onSlotClick,
+                onMineClick = onMineClick
             )
         }
     }
@@ -423,7 +429,8 @@ private fun LazyListScope.timeItems(
     times: List<TimeSlots>,
     selectedSlot: SelectedSlot?,
     entranceOpen: Boolean,
-    onSlotClick: (courtId: Int, start: Instant) -> Unit
+    onSlotClick: (courtId: Int, start: Instant) -> Unit,
+    onMineClick: () -> Unit
 ) {
     itemsIndexed(times, key = { _, timeSlots -> "time-${timeSlots.start.epochSecond}" }) { index, timeSlots ->
         EntranceAnimation(
@@ -431,7 +438,12 @@ private fun LazyListScope.timeItems(
             animate = entranceOpen,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 5.dp)
         ) {
-            TimeCard(timeSlots = timeSlots, selectedSlot = selectedSlot, onSlotClick = onSlotClick)
+            TimeCard(
+                timeSlots = timeSlots,
+                selectedSlot = selectedSlot,
+                onSlotClick = onSlotClick,
+                onMineClick = onMineClick
+            )
         }
     }
 }
@@ -586,8 +598,8 @@ private fun DayChip(day: LocalDate, isToday: Boolean, selected: Boolean, locked:
 }
 
 /**
- * Plegada solo enseña las horas que se pueden reservar (y las propias); al tocarla se despliega con todas, también las
- * no disponibles, en su orden.
+ * Plegada solo enseña las horas que se pueden reservar y las reservas propias; al tocarla se despliega con todas, también
+ * las no disponibles, en su orden.
  */
 @Composable
 private fun CourtCard(
@@ -595,11 +607,15 @@ private fun CourtCard(
     selectedSlot: SelectedSlot?,
     expanded: Boolean,
     onExpandToggle: () -> Unit,
-    onSlotClick: (courtId: Int, start: Instant) -> Unit
+    onSlotClick: (courtId: Int, start: Instant) -> Unit,
+    onMineClick: () -> Unit
 ) {
     val court = courtSlots.court
     val freeSlots = courtSlots.slots.count { it.state == SlotState.Free }
     val slots = if (expanded) courtSlots.slots else courtSlots.slots.filter { it.state != SlotState.Unavailable }
+    val items = remember(slots, courtSlots.mine) {
+        (slots.map(GridItem::Hour) + courtSlots.mine.map(GridItem::Mine)).sortedBy { it.start }
+    }
     val toggleLabel = stringResource(if (expanded) R.string.booking_court_collapse else R.string.booking_court_expand)
     // Las horas solo se animan justo después de desplegar o plegar: la lista vuelve a componer las tarjetas al hacer
     // scroll, y sin esto cada vez que una entraba en pantalla sus horas aparecían con fundido y deslizándose
@@ -614,14 +630,36 @@ private fun CourtCard(
     }
     CourtCardSurface(clickModifier = Modifier.clickable(onClickLabel = toggleLabel, onClick = onClick)) {
         CourtHeader(court = court, freeSlots = freeSlots, expanded = expanded)
-        SlotGrid(slots, animate = animateSlots) { slot, modifier ->
-            SlotChip(
-                slot = slot,
-                selected = selectedSlot == SelectedSlot(court.id, slot.start),
-                onClick = { onSlotClick(court.id, slot.start) },
-                modifier = modifier
-            )
+        SlotGrid(items, animate = animateSlots) { item, modifier ->
+            when (item) {
+                is GridItem.Hour -> SlotChip(
+                    slot = item.slot,
+                    selected = selectedSlot == SelectedSlot(court.id, item.slot.start),
+                    onClick = { onSlotClick(court.id, item.slot.start) },
+                    modifier = modifier
+                )
+
+                is GridItem.Mine -> MineChip(
+                    item.booking,
+                    showCourt = false,
+                    onClick = onMineClick,
+                    modifier = modifier
+                )
+            }
         }
+    }
+}
+
+/** Lo que va en la cuadrícula de una pista: una hora, o una reserva propia, que ocupa una fila entera. */
+private sealed interface GridItem {
+    val start: Instant
+
+    data class Hour(val slot: Slot) : GridItem {
+        override val start: Instant get() = slot.start
+    }
+
+    data class Mine(val booking: MyBooking) : GridItem {
+        override val start: Instant get() = booking.start
     }
 }
 
@@ -631,7 +669,7 @@ private fun CourtCard(
  * un fundido.
  */
 @Composable
-private fun SlotGrid(slots: List<Slot>, animate: Boolean, chip: @Composable (Slot, Modifier) -> Unit) {
+private fun SlotGrid(items: List<GridItem>, animate: Boolean, chip: @Composable (GridItem, Modifier) -> Unit) {
     BoxWithConstraints {
         val gap = 6.dp
         // En píxeles enteros y redondeando hacia abajo: con decimales, las 3 podían pasarse un píxel y la tercera
@@ -645,18 +683,18 @@ private fun SlotGrid(slots: List<Slot>, animate: Boolean, chip: @Composable (Slo
                 horizontalArrangement = Arrangement.spacedBy(gap),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                slots.forEach { slot ->
-                    key(slot.start) {
+                items.forEach { item ->
+                    key(item.start) {
                         val alpha = remember { Animatable(if (animate) 0f else 1f) }
                         LaunchedEffect(Unit) { alpha.animateTo(1f) }
                         chip(
-                            slot,
+                            item,
                             Modifier
                                 .animateBounds(
                                     lookaheadScope = this@LookaheadScope,
                                     boundsTransform = { _, _ -> if (animate) slotBoundsSpec else snap() }
                                 )
-                                .width(chipWidth)
+                                .then(if (item is GridItem.Mine) Modifier.fillMaxWidth() else Modifier.width(chipWidth))
                                 .graphicsLayer { this.alpha = alpha.value }
                         )
                     }
@@ -741,7 +779,7 @@ private const val SLOT_ANIMATION_WINDOW_MILLIS = 600L
 private val slotBoundsSpec =
     spring(stiffness = Spring.StiffnessMediumLow, visibilityThreshold = Rect.VisibilityThreshold)
 
-/** Fondo y texto de un hueco: el elegido en azul, los libres en lima, los propios en azul claro. */
+/** Fondo y texto de un hueco: el elegido en azul y los libres en lima. */
 @Composable
 private fun slotColors(state: SlotState, selected: Boolean): Pair<Color, Color> {
     val scheme = MaterialTheme.colorScheme
@@ -749,8 +787,6 @@ private fun slotColors(state: SlotState, selected: Boolean): Pair<Color, Color> 
         selected -> scheme.primary to scheme.onPrimary
 
         state == SlotState.Free -> MaterialTheme.padelColors.available to MaterialTheme.padelColors.onAvailable
-
-        state == SlotState.Mine -> scheme.primaryContainer to scheme.onPrimaryContainer
 
         // Las no disponibles van sin fondo, solo con la hora tachada, para que destaque lo libre
         else -> Color.Transparent to scheme.onSurfaceVariant.copy(alpha = 0.45f)
@@ -803,12 +839,13 @@ private fun SlotChip(slot: Slot, selected: Boolean, onClick: () -> Unit, modifie
     }
 }
 
-/** Tarjeta de la vista por hora: la hora y, debajo, las pistas libres (o propias) a esa hora. */
+/** Tarjeta de la vista por hora: la hora, las reservas propias que empiezan entonces y las pistas libres a esa hora. */
 @Composable
 private fun TimeCard(
     timeSlots: TimeSlots,
     selectedSlot: SelectedSlot?,
-    onSlotClick: (courtId: Int, start: Instant) -> Unit
+    onSlotClick: (courtId: Int, start: Instant) -> Unit,
+    onMineClick: () -> Unit
 ) {
     val free = timeSlots.courts.count { it.state == SlotState.Free }
     PadelCard {
@@ -821,6 +858,9 @@ private fun TimeCard(
                     modifier = Modifier.weight(1f)
                 )
                 if (free > 0) FreeTag(pluralStringResource(R.plurals.booking_free_courts, free, free))
+            }
+            timeSlots.mine.forEach { booking ->
+                MineChip(booking, showCourt = true, onClick = onMineClick, modifier = Modifier.fillMaxWidth())
             }
             timeSlots.courts.chunked(SLOT_COLUMNS).forEach { row ->
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -861,6 +901,51 @@ private fun CourtChip(courtAtTime: CourtAtTime, selected: Boolean, onClick: () -
                 overflow = TextOverflow.Ellipsis
             )
         }
+    }
+}
+
+/**
+ * Una reserva propia entera, de la hora de inicio a la de fin. Va con borde y sin relleno para que se lea como un
+ * dato y no como un hueco que reservar; al tocarla se abre Mis reservas.
+ */
+@Composable
+private fun MineChip(booking: MyBooking, showCourt: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val scheme = MaterialTheme.colorScheme
+    val start = booking.time.hourText()
+    val end = booking.endTime.hourText()
+    val text = if (showCourt) {
+        stringResource(R.string.booking_mine_court, booking.court.name, start, end)
+    } else {
+        stringResource(R.string.booking_mine, start, end)
+    }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
+        modifier = modifier
+            .height(40.dp)
+            .clip(MaterialTheme.shapes.small)
+            .border(1.dp, scheme.primary, MaterialTheme.shapes.small)
+            .clickable(
+                role = Role.Button,
+                onClickLabel = stringResource(R.string.booking_limit_see_reservations),
+                onClick = onClick
+            )
+            .padding(horizontal = 12.dp)
+    ) {
+        Icon(
+            painter = painterResource(R.drawable.ic_check),
+            contentDescription = null,
+            tint = scheme.primary,
+            modifier = Modifier.size(16.dp)
+        )
+        Spacer(Modifier.width(6.dp))
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelLarge,
+            color = scheme.primary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 
@@ -925,7 +1010,6 @@ private fun BookingView.icon(): Int = when (this) {
 private fun SlotState.descriptionRes(): Int = when (this) {
     SlotState.Free -> R.string.booking_slot_free
     SlotState.Unavailable -> R.string.booking_slot_unavailable
-    SlotState.Mine -> R.string.booking_slot_mine
 }
 
 @Preview(showBackground = true)
@@ -937,10 +1021,17 @@ private fun BookingContentPreview() {
         LocalTime.of(17, 0) to SlotState.Unavailable,
         LocalTime.of(17, 30) to SlotState.Free,
         LocalTime.of(18, 0) to SlotState.Free,
-        LocalTime.of(18, 30) to SlotState.Mine
+        LocalTime.of(20, 0) to SlotState.Free
     ).map { (time, state) ->
         Slot(today.atTime(time).atZone(Syltek.ZONE).toInstant(), time, state, maxMinutes = 90)
     }
+    val mine =
+        MyBooking(
+            court,
+            today.atTime(18, 30).atZone(Syltek.ZONE).toInstant(),
+            LocalTime.of(18, 30),
+            LocalTime.of(20, 0)
+        )
     PadelPratTheme {
         BookingContent(
             uiState = BookingUiState(
@@ -948,7 +1039,9 @@ private fun BookingContentPreview() {
                 selectedDay = today,
                 dayPart = DayPart.Afternoon,
                 lastOpenDay = today.plusDays(7),
-                content = listOf(CourtSlots(court, slots)).let { BookingContent.Loaded(it, SlotCalculator.byTime(it)) }
+                content = listOf(CourtSlots(court, slots, listOf(mine))).let {
+                    BookingContent.Loaded(it, SlotCalculator.byTime(it))
+                }
             ),
             onDaySelect = {},
             onDayPartSelect = {},
