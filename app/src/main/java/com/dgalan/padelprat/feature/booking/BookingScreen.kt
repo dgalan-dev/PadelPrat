@@ -1,24 +1,18 @@
 package com.dgalan.padelprat.feature.booking
 
 import androidx.compose.animation.animateBounds
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.VisibilityThreshold
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -27,13 +21,16 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
@@ -41,20 +38,16 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
@@ -68,18 +61,15 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableStateSetOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.Saver
-import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.LookaheadScope
 import androidx.compose.ui.layout.boundsInParent
@@ -97,6 +87,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -105,32 +96,48 @@ import com.dgalan.padelprat.R
 import com.dgalan.padelprat.core.network.Syltek
 import com.dgalan.padelprat.data.booking.BOOKING_DURATIONS
 import com.dgalan.padelprat.data.booking.Court
+import com.dgalan.padelprat.data.booking.CourtAtTime
 import com.dgalan.padelprat.data.booking.CourtSlots
 import com.dgalan.padelprat.data.booking.DayPart
 import com.dgalan.padelprat.data.booking.Slot
+import com.dgalan.padelprat.data.booking.SlotCalculator
 import com.dgalan.padelprat.data.booking.SlotState
+import com.dgalan.padelprat.data.booking.TimeSlots
+import com.dgalan.padelprat.ui.components.CourtName
+import com.dgalan.padelprat.ui.components.MessageState
+import com.dgalan.padelprat.ui.components.PadelCard
 import com.dgalan.padelprat.ui.components.PillSwitch
+import com.dgalan.padelprat.ui.components.ShimmerBox
+import com.dgalan.padelprat.ui.components.Tag
+import com.dgalan.padelprat.ui.format.hourText
+import com.dgalan.padelprat.ui.format.openingText
+import com.dgalan.padelprat.ui.format.shortName
 import com.dgalan.padelprat.ui.theme.PadelPratTheme
-import java.time.DayOfWeek
+import com.dgalan.padelprat.ui.theme.padelColors
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
-import java.time.format.DateTimeFormatter
-import java.time.format.TextStyle
-import java.util.Locale
 import kotlinx.coroutines.delay
 
+/** [onReservationsClick] lleva a la pestaña Mis reservas (desde el aviso de programada o el de límite). */
 @Composable
-fun BookingScreen(modifier: Modifier = Modifier, viewModel: BookingViewModel = hiltViewModel()) {
+fun BookingScreen(
+    onReservationsClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    viewModel: BookingViewModel = hiltViewModel()
+) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val message = (uiState.message as? BookingMessage.Scheduled)?.let {
         stringResource(R.string.schedule_saved, it.opensAt.openingText())
     }
+    val messageAction = stringResource(R.string.booking_see_reservations)
+    val currentOnReservationsClick by rememberUpdatedState(onReservationsClick)
     LaunchedEffect(message) {
         if (message != null) {
-            snackbarHostState.showSnackbar(message)
+            val result = snackbarHostState.showSnackbar(message, actionLabel = messageAction)
             viewModel.onMessageShow()
+            if (result == SnackbarResult.ActionPerformed) currentOnReservationsClick()
         }
     }
 
@@ -140,12 +147,14 @@ fun BookingScreen(modifier: Modifier = Modifier, viewModel: BookingViewModel = h
             onDaySelect = viewModel::onDaySelect,
             onDayPartSelect = viewModel::onDayPartSelect,
             onDurationSelect = viewModel::onDurationSelect,
+            onViewSelect = viewModel::onViewSelect,
             onSlotClick = viewModel::onSlotClick,
             onScheduleTimeSelect = viewModel::onScheduleTimeSelect,
             onScheduleCourtToggle = viewModel::onScheduleCourtToggle,
             onScheduleSave = viewModel::onScheduleSave,
             onRefresh = viewModel::onRefresh,
-            onRetry = viewModel::onRetry
+            onRetry = viewModel::onRetry,
+            onReservationsClick = onReservationsClick
         )
         SnackbarHost(
             hostState = snackbarHostState,
@@ -166,9 +175,10 @@ fun BookingScreen(modifier: Modifier = Modifier, viewModel: BookingViewModel = h
 }
 
 /**
- * Una sola lista: el título se va al hacer scroll y los filtros se quedan fijos arriba (cabecera fija), con una línea
- * debajo cuando ya hay contenido pasando por detrás. Tirar hacia abajo recarga las pistas, así que el indicador sale
- * justo debajo de los filtros.
+ * Una sola lista: el título se va al hacer scroll y los filtros se quedan fijos arriba (cabecera fija), que cambia de
+ * tono cuando ya hay contenido pasando por detrás, como la barra superior de Material 3 (también por debajo de la
+ * barra de estado). Tirar hacia abajo recarga las pistas, así que el indicador sale justo debajo de los
+ * filtros.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -177,23 +187,30 @@ private fun BookingContent(
     onDaySelect: (LocalDate) -> Unit,
     onDayPartSelect: (DayPart) -> Unit,
     onDurationSelect: (Int) -> Unit,
+    onViewSelect: (BookingView) -> Unit,
     onSlotClick: (courtId: Int, start: Instant) -> Unit,
     onScheduleTimeSelect: (LocalTime) -> Unit,
     onScheduleCourtToggle: (Int) -> Unit,
     onScheduleSave: () -> Unit,
     onRefresh: () -> Unit,
     onRetry: () -> Unit,
+    onReservationsClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Cada día empieza arriba: el estado de scroll es nuevo en el mismo instante en que cambia el contenido. Si se
-    // arrastrara la posición del día anterior, la lista saltaba al cargar el nuevo (con solo 3 siluetas no cabía).
-    val listState = remember(uiState.selectedDay) { LazyListState() }
+    // Cada día (y cada vista) empieza arriba: el estado de scroll es nuevo en el mismo instante en que cambia el
+    // contenido. Si se arrastrara la posición anterior, la lista saltaba al cargar el nuevo (con solo 3 siluetas no
+    // cabía).
+    val listState = remember(uiState.selectedDay, uiState.view) { LazyListState() }
     val filtersPinned by remember(listState) { derivedStateOf { listState.firstVisibleItemIndex > 0 } }
+    val headerColor by animateColorAsState(
+        targetValue = if (filtersPinned) MaterialTheme.padelColors.pinnedHeader else MaterialTheme.colorScheme.surface,
+        label = "headerColor"
+    )
 
     // Entrada de las tarjetas: solo las que se componen en el primer frame tras cargar, que son las que se ven. Las que
     // llegan después con el scroll aparecen sin más. Se hace una vez por día y filtros (al volver a uno ya visto no se
     // repite) y otra vez tras cada recarga (siluetas).
-    val entranceKey = EntranceKey(uiState.selectedDay, uiState.dayPart, uiState.durationMinutes)
+    val entranceKey = EntranceKey(uiState.selectedDay, uiState.dayPart, uiState.durationMinutes, uiState.view)
     val playedEntrances = remember { mutableStateSetOf<EntranceKey>() }
     if (uiState.content is BookingContent.Loading) SideEffect { playedEntrances.remove(entranceKey) }
     val entranceOpen = uiState.content is BookingContent.Loaded && entranceKey !in playedEntrances
@@ -210,107 +227,166 @@ private fun BookingContent(
     // Borde inferior de los filtros dentro de la lista, para colocar ahí el indicador de refresco
     var filtersBottom by remember { mutableIntStateOf(0) }
 
-    // Nunca se queda "refrescando": al soltar se recarga y lo que se ve son las siluetas de carga
-    PullToRefreshBox(
-        isRefreshing = false,
-        onRefresh = onRefresh,
-        state = pullState,
-        indicator = {
-            PullToRefreshDefaults.Indicator(
-                state = pullState,
-                isRefreshing = false,
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .offset { IntOffset(0, filtersBottom) }
-            )
-        },
-        modifier = modifier.fillMaxSize()
-    ) {
-        LazyColumn(
-            state = listState,
-            contentPadding = PaddingValues(bottom = 16.dp),
-            modifier = Modifier.fillMaxSize()
+    Column(modifier = modifier.fillMaxSize()) {
+        // Fondo de la barra de estado, del mismo color que la cabecera
+        Spacer(
+            Modifier
+                .fillMaxWidth()
+                .windowInsetsTopHeight(WindowInsets.statusBars)
+                .drawBehind { drawRect(headerColor) }
+        )
+        // Nunca se queda "refrescando": al soltar se recarga y lo que se ve son las siluetas de carga
+        PullToRefreshBox(
+            isRefreshing = false,
+            onRefresh = onRefresh,
+            state = pullState,
+            indicator = {
+                PullToRefreshDefaults.Indicator(
+                    state = pullState,
+                    isRefreshing = false,
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .offset { IntOffset(0, filtersBottom) }
+                )
+            },
+            modifier = Modifier.weight(1f)
         ) {
-            item(key = "title") {
-                Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp)) {
-                    // "Hola, Marc", como en el mock; hasta que llegan los datos del perfil, solo el título
-                    uiState.firstName?.let {
-                        Text(
-                            text = stringResource(R.string.booking_greeting, it),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+            LazyColumn(
+                state = listState,
+                contentPadding = PaddingValues(bottom = 16.dp),
+                modifier = Modifier.fillMaxSize()
+            ) {
+                item(key = "title") {
+                    Title(
+                        firstName = uiState.firstName,
+                        // Los días cerrados enseñan el formulario de programar, que no tiene vistas
+                        view = uiState.view.takeUnless { uiState.isLocked(uiState.selectedDay) },
+                        onViewSelect = onViewSelect,
+                        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp)
+                    )
+                }
+                stickyHeader(key = "filters") {
+                    Filters(
+                        uiState = uiState,
+                        background = { headerColor },
+                        onDaySelect = onDaySelect,
+                        onDayPartSelect = onDayPartSelect,
+                        onDurationSelect = onDurationSelect,
+                        modifier = Modifier.onGloballyPositioned { filtersBottom = it.boundsInParent().bottom.toInt() }
+                    )
+                }
+                if (uiState.reservationLimitReached) {
+                    item(key = "limit") {
+                        LimitBanner(onReservationsClick, Modifier.padding(horizontal = 16.dp, vertical = 5.dp))
+                    }
+                }
+                when (val content = uiState.content) {
+                    BookingContent.Loading -> items(SKELETON_CARDS, key = { "skeleton$it" }) {
+                        SkeletonCourtCard(Modifier.padding(horizontal = 16.dp, vertical = 5.dp))
+                    }
+
+                    is BookingContent.Error -> item(key = "error") { ErrorState(content.error, onRetry) }
+
+                    is BookingContent.Loaded -> if (content.courts.isEmpty()) {
+                        item(key = "empty") { EmptyState(uiState.dayPart, uiState.durationMinutes) }
+                    } else if (uiState.view == BookingView.Times) {
+                        timeItems(
+                            times = content.times,
+                            selectedSlot = uiState.sheet?.selectedSlot,
+                            entranceOpen = entranceOpen,
+                            onSlotClick = onSlotClick
+                        )
+                    } else {
+                        courtItems(
+                            courts = content.courts,
+                            selectedSlot = uiState.sheet?.selectedSlot,
+                            entranceOpen = entranceOpen,
+                            expandedCourts = expandedCourts,
+                            onSlotClick = onSlotClick
                         )
                     }
-                    Text(
-                        text = stringResource(R.string.booking_title),
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-            }
-            stickyHeader(key = "filters") {
-                Filters(
-                    uiState = uiState,
-                    pinned = filtersPinned,
-                    onDaySelect = onDaySelect,
-                    onDayPartSelect = onDayPartSelect,
-                    onDurationSelect = onDurationSelect,
-                    modifier = Modifier.onGloballyPositioned { filtersBottom = it.boundsInParent().bottom.toInt() }
-                )
-            }
-            if (uiState.reservationLimitReached) {
-                item(key = "limit") {
-                    LimitBanner(Modifier.padding(horizontal = 16.dp, vertical = 5.dp))
-                }
-            }
-            when (val content = uiState.content) {
-                BookingContent.Loading -> items(SKELETON_CARDS, key = { "skeleton$it" }) {
-                    SkeletonCourtCard(Modifier.padding(horizontal = 16.dp, vertical = 5.dp))
-                }
 
-                is BookingContent.Error -> item(key = "error") { ErrorState(content.error, onRetry) }
-
-                is BookingContent.Loaded -> if (content.courts.isEmpty()) {
-                    item(key = "empty") { EmptyState(uiState.dayPart, uiState.durationMinutes) }
-                } else {
-                    courtItems(
-                        courts = content.courts,
-                        selectedSlot = uiState.sheet?.selectedSlot,
-                        entranceOpen = entranceOpen,
-                        expandedCourts = expandedCourts,
-                        onSlotClick = onSlotClick
-                    )
+                    is BookingContent.Schedule ->
+                        scheduleItems(content.form, onScheduleTimeSelect, onScheduleCourtToggle, onScheduleSave)
                 }
-
-                is BookingContent.Schedule ->
-                    scheduleItems(content.form, onScheduleTimeSelect, onScheduleCourtToggle, onScheduleSave)
             }
         }
     }
 }
 
-private data class EntranceKey(val day: LocalDate, val dayPart: DayPart, val durationMinutes: Int)
+private data class EntranceKey(
+    val day: LocalDate,
+    val dayPart: DayPart,
+    val durationMinutes: Int,
+    val view: BookingView
+)
+
+/** "Hola, Marc" y el título, con el selector de vista (por pista o por hora) a la derecha si hay [view]. */
+@Composable
+private fun Title(
+    firstName: String?,
+    view: BookingView?,
+    onViewSelect: (BookingView) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val viewLabels = BookingView.entries.associateWith { stringResource(it.label()) }
+    Row(verticalAlignment = Alignment.Bottom, modifier = modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.weight(1f)) {
+            // Como en el mock; hasta que llegan los datos del perfil, solo el título
+            firstName?.let {
+                Text(
+                    text = stringResource(R.string.booking_greeting, it),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Text(
+                text = stringResource(R.string.booking_title),
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
+        if (view != null) {
+            Spacer(Modifier.width(12.dp))
+            PillSwitch(
+                options = BookingView.entries,
+                selected = view,
+                onSelect = onViewSelect,
+                label = { viewLabels.getValue(it) },
+                icon = { it.icon() },
+                modifier = Modifier.width(96.dp)
+            )
+        }
+    }
+}
 
 private const val SKELETON_CARDS = 3
 
 /** Aviso de que se ha llegado al máximo de reservas del club: se puede mirar, pero no reservar otra. */
 @Composable
-private fun LimitBanner(modifier: Modifier = Modifier) {
+private fun LimitBanner(onReservationsClick: () -> Unit, modifier: Modifier = Modifier) {
     Surface(
-        shape = RoundedCornerShape(16.dp),
+        shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.secondaryContainer,
         modifier = modifier.fillMaxWidth()
     ) {
-        Text(
-            text = pluralStringResource(
-                R.plurals.reservation_limit_reached,
-                Syltek.MAX_ACTIVE_RESERVATIONS,
-                Syltek.MAX_ACTIVE_RESERVATIONS
-            ),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSecondaryContainer,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
-        )
+        Column(modifier = Modifier.padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 4.dp)) {
+            Text(
+                text = pluralStringResource(
+                    R.plurals.reservation_limit_reached,
+                    Syltek.MAX_ACTIVE_RESERVATIONS,
+                    Syltek.MAX_ACTIVE_RESERVATIONS
+                ),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSecondaryContainer
+            )
+            TextButton(onClick = onReservationsClick, modifier = Modifier.align(Alignment.End)) {
+                Text(
+                    text = stringResource(R.string.booking_limit_see_reservations),
+                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+            }
+        }
     }
 }
 
@@ -338,6 +414,24 @@ private fun LazyListScope.courtItems(
                 onExpandToggle = { if (!expandedCourts.remove(courtId)) expandedCourts.add(courtId) },
                 onSlotClick = onSlotClick
             )
+        }
+    }
+}
+
+/** Vista por hora: una tarjeta por hora de inicio con las pistas libres a esa hora. */
+private fun LazyListScope.timeItems(
+    times: List<TimeSlots>,
+    selectedSlot: SelectedSlot?,
+    entranceOpen: Boolean,
+    onSlotClick: (courtId: Int, start: Instant) -> Unit
+) {
+    itemsIndexed(times, key = { _, timeSlots -> "time-${timeSlots.start.epochSecond}" }) { index, timeSlots ->
+        EntranceAnimation(
+            delayMillis = index * 50,
+            animate = entranceOpen,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 5.dp)
+        ) {
+            TimeCard(timeSlots = timeSlots, selectedSlot = selectedSlot, onSlotClick = onSlotClick)
         }
     }
 }
@@ -373,16 +467,16 @@ private fun EntranceAnimation(
 @Composable
 private fun Filters(
     uiState: BookingUiState,
-    pinned: Boolean,
+    background: () -> Color,
     onDaySelect: (LocalDate) -> Unit,
     onDayPartSelect: (DayPart) -> Unit,
     onDurationSelect: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val dividerAlpha by animateFloatAsState(if (pinned) 1f else 0f, label = "filtersDivider")
     val dayPartLabels = DayPart.entries.associateWith { stringResource(it.label()) }
     val durationLabel = stringResource(R.string.booking_duration)
-    Column(modifier = modifier.background(MaterialTheme.colorScheme.surface)) {
+    // El color se lee al dibujar: la animación de la cabecera solo repinta
+    Column(modifier = modifier.drawBehind { drawRect(background()) }) {
         Spacer(Modifier.height(16.dp))
         DaySelector(
             days = uiState.days,
@@ -411,11 +505,6 @@ private fun Filters(
             )
         }
         Spacer(Modifier.height(12.dp))
-        HorizontalDivider(
-            color = MaterialTheme.colorScheme.outlineVariant,
-            modifier = Modifier.graphicsLayer { alpha = dividerAlpha }
-        )
-        Spacer(Modifier.height(5.dp))
     }
 }
 
@@ -466,7 +555,7 @@ private fun DayChip(day: LocalDate, isToday: Boolean, selected: Boolean, locked:
     Box(
         modifier = Modifier
             .width(64.dp)
-            .background(background, RoundedCornerShape(16.dp))
+            .background(background, MaterialTheme.shapes.medium)
             .clickable(role = Role.Tab, onClick = onClick)
             .semantics {
                 this.selected = selected
@@ -584,16 +673,7 @@ private fun CourtCardSurface(
     clickModifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
-    val shape = RoundedCornerShape(24.dp)
-    Surface(
-        shape = shape,
-        color = MaterialTheme.colorScheme.surfaceContainerLowest,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(shape)
-            .then(clickModifier)
-    ) {
+    PadelCard(modifier = modifier.clip(MaterialTheme.shapes.large).then(clickModifier)) {
         Column(
             modifier = Modifier
                 .animateContentSize()
@@ -609,39 +689,10 @@ private fun CourtCardSurface(
 private fun CourtHeader(court: Court, freeSlots: Int, expanded: Boolean) {
     val arrowRotation by animateFloatAsState(if (expanded) 180f else 0f, label = "courtArrow")
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(
-            painter = painterResource(
-                if (court.covered) R.drawable.ic_court_covered else R.drawable.ic_court_uncovered
-            ),
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(20.dp)
-        )
+        CourtIcon(court, tint = MaterialTheme.colorScheme.onSurfaceVariant, size = 20.dp)
         Spacer(Modifier.width(10.dp))
         Column(modifier = Modifier.weight(1f)) {
-            // Patrocinador junto al nombre, más pequeño y en azul; si no cabe se corta él, nunca el nombre
-            Row {
-                Text(
-                    text = court.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    modifier = Modifier.alignByBaseline()
-                )
-                court.sponsor?.let { sponsor ->
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        text = sponsor,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier
-                            .weight(1f, fill = false)
-                            .alignByBaseline()
-                    )
-                }
-            }
+            CourtName(name = court.name, sponsor = court.sponsor, style = MaterialTheme.typography.titleMedium)
             Text(
                 text = stringResource(if (court.covered) R.string.booking_covered else R.string.booking_uncovered),
                 style = MaterialTheme.typography.bodySmall,
@@ -649,7 +700,7 @@ private fun CourtHeader(court: Court, freeSlots: Int, expanded: Boolean) {
             )
         }
         Spacer(Modifier.width(8.dp))
-        if (freeSlots > 0) FreeSlotsTag(freeSlots)
+        if (freeSlots > 0) FreeTag(pluralStringResource(R.plurals.booking_free_slots, freeSlots, freeSlots))
         Spacer(Modifier.width(4.dp))
         Icon(
             painter = painterResource(R.drawable.ic_expand_more),
@@ -662,28 +713,24 @@ private fun CourtHeader(court: Court, freeSlots: Int, expanded: Boolean) {
     }
 }
 
-/** Etiqueta lima con los huecos libres, como la etiqueta "Disponible" del mock. */
+/** Etiqueta en lima intenso con los huecos libres, como la etiqueta "Disponible" del mock. */
 @Composable
-private fun FreeSlotsTag(count: Int) {
-    val (background, content) = freeColors()
-    Text(
-        text = pluralStringResource(R.plurals.booking_free_slots, count, count),
-        style = MaterialTheme.typography.labelMedium,
-        color = content,
-        modifier = Modifier
-            .background(background, RoundedCornerShape(8.dp))
-            .padding(horizontal = 10.dp, vertical = 3.dp)
+private fun FreeTag(text: String) {
+    Tag(
+        text = text,
+        containerColor = MaterialTheme.padelColors.accent,
+        contentColor = MaterialTheme.padelColors.onAccent
     )
 }
 
-/** Lima de bola. En oscuro tertiaryContainer es un oliva apagado; tertiary mantiene el lima. */
 @Composable
-internal fun freeColors() = MaterialTheme.colorScheme.let { scheme ->
-    if (isSystemInDarkTheme()) {
-        scheme.tertiary to scheme.onTertiary
-    } else {
-        scheme.tertiaryContainer to scheme.onTertiaryContainer
-    }
+private fun CourtIcon(court: Court, tint: Color, size: Dp) {
+    Icon(
+        painter = painterResource(if (court.covered) R.drawable.ic_court_covered else R.drawable.ic_court_uncovered),
+        contentDescription = null,
+        tint = tint,
+        modifier = Modifier.size(size)
+    )
 }
 
 private const val SLOT_COLUMNS = 3
@@ -693,85 +740,142 @@ private const val SLOT_ANIMATION_WINDOW_MILLIS = 600L
 
 private val slotBoundsSpec =
     spring(stiffness = Spring.StiffnessMediumLow, visibilityThreshold = Rect.VisibilityThreshold)
-private val TIME_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
 
+/** Fondo y texto de un hueco: el elegido en azul, los libres en lima, los propios en azul claro. */
 @Composable
-private fun SlotChip(slot: Slot, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun slotColors(state: SlotState, selected: Boolean): Pair<Color, Color> {
     val scheme = MaterialTheme.colorScheme
-    val transparent = scheme.surface.copy(alpha = 0f)
-    // Las no disponibles van sin fondo, solo con la hora tachada, para que destaque lo libre
-    val (background, content) = when {
+    return when {
         selected -> scheme.primary to scheme.onPrimary
-        slot.state == SlotState.Free -> freeColors()
-        slot.state == SlotState.Mine -> scheme.primaryContainer to scheme.onPrimaryContainer
-        else -> transparent to scheme.onSurfaceVariant.copy(alpha = 0.45f)
-    }
-    val time = slot.time.format(TIME_FORMAT)
-    val description = stringResource(slot.state.descriptionRes(), time)
 
+        state == SlotState.Free -> MaterialTheme.padelColors.available to MaterialTheme.padelColors.onAvailable
+
+        state == SlotState.Mine -> scheme.primaryContainer to scheme.onPrimaryContainer
+
+        // Las no disponibles van sin fondo, solo con la hora tachada, para que destaque lo libre
+        else -> Color.Transparent to scheme.onSurfaceVariant.copy(alpha = 0.45f)
+    }
+}
+
+/** Chip de la parrilla; solo los libres se pueden tocar. [description] es lo que lee TalkBack. */
+@Composable
+private fun GridChip(
+    state: SlotState,
+    selected: Boolean,
+    description: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable (Color) -> Unit
+) {
+    val (background, contentColor) = slotColors(state, selected)
     Box(
         modifier = modifier
             .height(40.dp)
-            .background(background, RoundedCornerShape(14.dp))
-            .then(
-                if (slot.state ==
-                    SlotState.Free
-                ) {
-                    Modifier.clickable(role = Role.Button, onClick = onClick)
-                } else {
-                    Modifier
-                }
-            )
+            .background(background, MaterialTheme.shapes.small)
+            .then(if (state == SlotState.Free) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier)
             .semantics {
                 contentDescription = description
                 this.selected = selected
             },
         contentAlignment = Alignment.Center
     ) {
+        content(contentColor)
+    }
+}
+
+@Composable
+private fun SlotChip(slot: Slot, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val time = slot.time.hourText()
+    GridChip(
+        state = slot.state,
+        selected = selected,
+        description = stringResource(slot.state.descriptionRes(), time),
+        onClick = onClick,
+        modifier = modifier
+    ) { color ->
         Text(
             text = time,
             style = MaterialTheme.typography.labelLarge,
-            color = content,
+            color = color,
             textDecoration = if (slot.state == SlotState.Unavailable) TextDecoration.LineThrough else null,
             textAlign = TextAlign.Center
         )
     }
 }
 
-/** Silueta de una tarjeta de pista mientras carga, con un brillo que la recorre. */
+/** Tarjeta de la vista por hora: la hora y, debajo, las pistas libres (o propias) a esa hora. */
+@Composable
+private fun TimeCard(
+    timeSlots: TimeSlots,
+    selectedSlot: SelectedSlot?,
+    onSlotClick: (courtId: Int, start: Instant) -> Unit
+) {
+    val free = timeSlots.courts.count { it.state == SlotState.Free }
+    PadelCard {
+        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = timeSlots.time.hourText(),
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f)
+                )
+                if (free > 0) FreeTag(pluralStringResource(R.plurals.booking_free_courts, free, free))
+            }
+            timeSlots.courts.chunked(SLOT_COLUMNS).forEach { row ->
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    row.forEach { courtAtTime ->
+                        CourtChip(
+                            courtAtTime = courtAtTime,
+                            selected = selectedSlot == SelectedSlot(courtAtTime.court.id, timeSlots.start),
+                            onClick = { onSlotClick(courtAtTime.court.id, timeSlots.start) },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    repeat(SLOT_COLUMNS - row.size) { Spacer(Modifier.weight(1f)) }
+                }
+            }
+        }
+    }
+}
+
+/** Pista de la vista por hora: su icono (cubierta o no) y su nombre. El patrocinador está en la hoja. */
+@Composable
+private fun CourtChip(courtAtTime: CourtAtTime, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val court = courtAtTime.court
+    GridChip(
+        state = courtAtTime.state,
+        selected = selected,
+        description = stringResource(courtAtTime.state.descriptionRes(), court.name),
+        onClick = onClick,
+        modifier = modifier
+    ) { color ->
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 8.dp)) {
+            CourtIcon(court, tint = color, size = 16.dp)
+            Spacer(Modifier.width(4.dp))
+            Text(
+                text = court.name,
+                style = MaterialTheme.typography.labelLarge,
+                color = color,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+/** Silueta de una tarjeta de pista mientras carga. */
 @Composable
 private fun SkeletonCourtCard(modifier: Modifier = Modifier) {
-    val transition = rememberInfiniteTransition(label = "skeleton")
-    val shimmer by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(durationMillis = 1200, easing = LinearEasing), RepeatMode.Restart),
-        label = "shimmer"
-    )
-    val base = MaterialTheme.colorScheme.surfaceVariant
-    val highlight = MaterialTheme.colorScheme.surfaceContainerLowest
-    // El valor se lee al dibujar: el brillo solo repinta, no recompone
-    val placeholder = Modifier.drawBehind {
-        val x = shimmer * size.width * 3f - size.width
-        drawRoundRect(
-            brush = Brush.linearGradient(
-                colors = listOf(base, highlight, base),
-                start = Offset(x, 0f),
-                end = Offset(x + size.width, 0f)
-            ),
-            cornerRadius = CornerRadius(12.dp.toPx())
-        )
-    }
-
     CourtCardSurface(modifier = modifier) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(20.dp).background(base, CircleShape))
+            ShimmerBox(Modifier.size(20.dp), cornerRadius = 10.dp)
             Spacer(Modifier.width(10.dp))
-            Box(Modifier.width(96.dp).height(18.dp).then(placeholder))
+            ShimmerBox(Modifier.width(96.dp).height(18.dp), cornerRadius = 12.dp)
         }
         repeat(2) {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                repeat(SLOT_COLUMNS) { Box(Modifier.weight(1f).height(40.dp).then(placeholder)) }
+                repeat(SLOT_COLUMNS) { ShimmerBox(Modifier.weight(1f).height(40.dp), cornerRadius = 12.dp) }
             }
         }
     }
@@ -780,6 +884,8 @@ private fun SkeletonCourtCard(modifier: Modifier = Modifier) {
 @Composable
 private fun EmptyState(dayPart: DayPart, durationMinutes: Int) {
     MessageState(
+        icon = R.drawable.ic_ball,
+        title = stringResource(R.string.booking_empty_title),
         message = stringResource(
             if (dayPart == DayPart.Morning) R.string.booking_empty_morning else R.string.booking_empty_afternoon,
             durationMinutes
@@ -789,46 +895,33 @@ private fun EmptyState(dayPart: DayPart, durationMinutes: Int) {
 
 @Composable
 private fun ErrorState(error: BookingError, onRetry: () -> Unit) {
+    val network = error == BookingError.Network
     MessageState(
-        message = stringResource(
-            if (error == BookingError.Network) R.string.booking_error_network else R.string.booking_error_unknown
-        ),
+        icon = R.drawable.ic_error,
+        title = stringResource(if (network) R.string.error_network_title else R.string.booking_error_unknown),
+        message = stringResource(if (network) R.string.error_network_text else R.string.error_unknown_text),
         action = {
             Button(onClick = onRetry) { Text(stringResource(R.string.booking_retry)) }
         }
     )
 }
 
-@Composable
-private fun MessageState(message: String, action: (@Composable () -> Unit)? = null) {
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 48.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = message,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
-        )
-        if (action != null) {
-            Spacer(Modifier.height(16.dp))
-            action()
-        }
-    }
-}
-
-private val SPANISH = Locale.forLanguageTag("es-ES")
-
-/** "Vie", "Sáb"…: la abreviatura del sistema puede traer punto final ("vie."). */
-private fun DayOfWeek.shortName(): String =
-    getDisplayName(TextStyle.SHORT, SPANISH).removeSuffix(".").replaceFirstChar { it.titlecase(SPANISH) }
-
 private fun DayPart.label(): Int = when (this) {
     DayPart.Morning -> R.string.booking_morning
     DayPart.Afternoon -> R.string.booking_afternoon
 }
 
+private fun BookingView.label(): Int = when (this) {
+    BookingView.Courts -> R.string.booking_view_courts
+    BookingView.Times -> R.string.booking_view_times
+}
+
+private fun BookingView.icon(): Int = when (this) {
+    BookingView.Courts -> R.drawable.ic_court_covered
+    BookingView.Times -> R.drawable.ic_schedule
+}
+
+/** Sirve para la hora ("18:30, libre") y para la pista en la vista por hora ("Pista 3, libre"). */
 private fun SlotState.descriptionRes(): Int = when (this) {
     SlotState.Free -> R.string.booking_slot_free
     SlotState.Unavailable -> R.string.booking_slot_unavailable
@@ -855,17 +948,19 @@ private fun BookingContentPreview() {
                 selectedDay = today,
                 dayPart = DayPart.Afternoon,
                 lastOpenDay = today.plusDays(7),
-                content = BookingContent.Loaded(listOf(CourtSlots(court, slots)))
+                content = listOf(CourtSlots(court, slots)).let { BookingContent.Loaded(it, SlotCalculator.byTime(it)) }
             ),
             onDaySelect = {},
             onDayPartSelect = {},
             onDurationSelect = {},
+            onViewSelect = {},
             onSlotClick = { _, _ -> },
             onScheduleTimeSelect = {},
             onScheduleCourtToggle = {},
             onScheduleSave = {},
             onRefresh = {},
-            onRetry = {}
+            onRetry = {},
+            onReservationsClick = {}
         )
     }
 }

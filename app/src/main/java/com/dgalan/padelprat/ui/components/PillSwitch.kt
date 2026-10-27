@@ -12,16 +12,19 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -31,7 +34,8 @@ import com.dgalan.padelprat.ui.theme.PadelPratTheme
 
 /**
  * Selector de opciones como el de los mocks ("Próximas / Pasadas"): una pista gris redondeada con la opción activa
- * en una píldora azul que se desliza al cambiar.
+ * en una píldora azul que se desliza al cambiar. Con [icon], cada opción es un icono y [label] queda como su
+ * descripción para TalkBack.
  */
 @Composable
 fun <T> PillSwitch(
@@ -39,7 +43,8 @@ fun <T> PillSwitch(
     selected: T,
     onSelect: (T) -> Unit,
     label: (T) -> String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    icon: ((T) -> Int)? = null
 ) {
     val scheme = MaterialTheme.colorScheme
     BoxWithConstraints(
@@ -76,12 +81,21 @@ fun <T> PillSwitch(
                         .selectable(selected = isSelected, role = Role.Tab, onClick = { onSelect(option) }),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = label(option),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = textColor,
-                        textAlign = TextAlign.Center
-                    )
+                    if (icon != null) {
+                        Icon(
+                            painter = painterResource(icon(option)),
+                            contentDescription = label(option),
+                            tint = textColor,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    } else {
+                        Text(
+                            text = label(option),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = textColor,
+                            textAlign = TextAlign.Center
+                        )
+                    }
                 }
             }
         }

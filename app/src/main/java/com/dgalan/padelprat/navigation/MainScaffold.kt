@@ -6,7 +6,11 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.systemBars
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -52,6 +56,8 @@ fun MainScaffold(modifier: Modifier = Modifier) {
 
     Scaffold(
         modifier = modifier,
+        // Cada pestaña se encarga de la barra de estado: Reservar la pinta del color de su cabecera fija
+        contentWindowInsets = WindowInsets.systemBars.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom),
         bottomBar = {
             // Pestaña activa: indicador en primaryContainer (como el mock) e icono y texto en el azul de la marca
             val scheme = MaterialTheme.colorScheme
@@ -88,8 +94,14 @@ fun MainScaffold(modifier: Modifier = Modifier) {
         ) { destination ->
             stateHolder.SaveableStateProvider(destination.name) {
                 when (destination) {
-                    TopLevelDestination.Booking -> BookingScreen()
-                    TopLevelDestination.Reservations -> ReservationsScreen()
+                    TopLevelDestination.Booking -> BookingScreen(
+                        onReservationsClick = { selected = TopLevelDestination.Reservations }
+                    )
+
+                    TopLevelDestination.Reservations -> ReservationsScreen(
+                        onBookClick = { selected = TopLevelDestination.Booking }
+                    )
+
                     TopLevelDestination.Profile -> ProfileScreen()
                 }
             }

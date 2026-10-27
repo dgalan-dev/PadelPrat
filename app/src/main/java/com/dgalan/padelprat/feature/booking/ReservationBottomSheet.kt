@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -48,12 +47,14 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.dgalan.padelprat.R
 import com.dgalan.padelprat.core.network.Syltek
-import java.time.format.DateTimeFormatter
-import java.util.Locale
+import com.dgalan.padelprat.ui.components.CourtName
+import com.dgalan.padelprat.ui.components.Tag
+import com.dgalan.padelprat.ui.format.hourText
+import com.dgalan.padelprat.ui.format.longDate
+import com.dgalan.padelprat.ui.theme.padelColors
 import kotlinx.coroutines.launch
 
 /**
@@ -116,12 +117,12 @@ private fun DetailsContent(
         AvailableTag()
         Spacer(Modifier.height(8.dp))
         Text(
-            text = sheet.slot.time.format(TIME_FORMAT),
+            text = sheet.slot.time.hourText(),
             style = MaterialTheme.typography.displaySmall,
             color = MaterialTheme.colorScheme.primary
         )
         Text(
-            text = stringResource(R.string.reservation_until, end.format(TIME_FORMAT), sheet.durationMinutes),
+            text = stringResource(R.string.reservation_until, end.hourText(), sheet.durationMinutes),
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -201,7 +202,8 @@ private fun SuccessContent(sheet: ReservationSheet, total: String?, onDone: () -
     LaunchedEffect(Unit) {
         scale.animateTo(1f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow))
     }
-    val (background, content) = freeColors()
+    val background = MaterialTheme.padelColors.accent
+    val content = MaterialTheme.padelColors.onAccent
 
     Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         Box(
@@ -234,8 +236,8 @@ private fun SuccessContent(sheet: ReservationSheet, total: String?, onDone: () -
             text = stringResource(
                 R.string.reservation_success_time,
                 sheet.longDate(),
-                sheet.slot.time.format(TIME_FORMAT),
-                end.format(TIME_FORMAT)
+                sheet.slot.time.hourText(),
+                end.hourText()
             ),
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -269,14 +271,10 @@ private fun SuccessContent(sheet: ReservationSheet, total: String?, onDone: () -
 
 @Composable
 private fun AvailableTag() {
-    val (background, content) = freeColors()
-    Text(
+    Tag(
         text = stringResource(R.string.reservation_available),
-        style = MaterialTheme.typography.labelMedium,
-        color = content,
-        modifier = Modifier
-            .background(background, RoundedCornerShape(8.dp))
-            .padding(horizontal = 10.dp, vertical = 3.dp)
+        containerColor = MaterialTheme.padelColors.accent,
+        contentColor = MaterialTheme.padelColors.onAccent
     )
 }
 
@@ -297,24 +295,7 @@ private fun CourtInfoRow(sheet: ReservationSheet) {
         InfoIcon(if (court.covered) R.drawable.ic_court_covered else R.drawable.ic_court_uncovered)
         Spacer(Modifier.width(12.dp))
         Column {
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(
-                    text = court.name,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.alignByBaseline()
-                )
-                court.sponsor?.let {
-                    Text(
-                        text = it,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.alignByBaseline()
-                    )
-                }
-            }
+            CourtName(name = court.name, sponsor = court.sponsor)
             Text(
                 text = stringResource(if (court.covered) R.string.booking_covered else R.string.booking_uncovered),
                 style = MaterialTheme.typography.bodySmall,
@@ -341,13 +322,8 @@ private fun InfoIcon(icon: Int) {
     }
 }
 
-private val TIME_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
-private val SPANISH = Locale.forLanguageTag("es-ES")
-private val LONG_DATE: DateTimeFormatter = DateTimeFormatter.ofPattern("EEEE, d 'de' MMMM", SPANISH)
-
 /** "Viernes, 23 de octubre". */
-private fun ReservationSheet.longDate(): String =
-    slot.start.atZone(Syltek.ZONE).format(LONG_DATE).replaceFirstChar { it.titlecase(SPANISH) }
+private fun ReservationSheet.longDate(): String = slot.start.atZone(Syltek.ZONE).toLocalDate().longDate()
 
 private fun ReservationError.messageRes(): Int = when (this) {
     ReservationError.SlotUnavailable -> R.string.reservation_error_slot_unavailable

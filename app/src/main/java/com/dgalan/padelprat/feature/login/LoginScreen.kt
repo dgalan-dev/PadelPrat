@@ -66,6 +66,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dgalan.padelprat.R
 import com.dgalan.padelprat.ui.theme.PadelPratTheme
+import com.dgalan.padelprat.ui.theme.padelColors
 
 @Composable
 fun LoginScreen(modifier: Modifier = Modifier, viewModel: LoginViewModel = hiltViewModel()) {
@@ -234,11 +235,8 @@ private fun BouncingBall(modifier: Modifier = Modifier) {
         )
     }
 
-    // En oscuro tertiaryContainer es un oliva apagado; tertiary mantiene el lima
-    val scheme = MaterialTheme.colorScheme
-    val dark = isSystemInDarkTheme()
-    val ballBackground = if (dark) scheme.tertiary else scheme.tertiaryContainer
-    val ballIcon = if (dark) scheme.onTertiary else scheme.onTertiaryContainer
+    val ballBackground = MaterialTheme.padelColors.accent
+    val ballIcon = MaterialTheme.padelColors.onAccent
 
     Box(
         modifier = modifier

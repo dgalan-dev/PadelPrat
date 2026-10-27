@@ -13,6 +13,7 @@ import com.dgalan.padelprat.data.booking.ReservationResult
 import com.dgalan.padelprat.data.booking.Slot
 import com.dgalan.padelprat.data.booking.SlotCalculator
 import com.dgalan.padelprat.data.booking.SlotState
+import com.dgalan.padelprat.data.booking.TimeSlots
 import com.dgalan.padelprat.data.booking.TimetableRepository
 import com.dgalan.padelprat.data.booking.TimetableResult
 import com.dgalan.padelprat.data.profile.ProfileRepository
@@ -43,8 +44,11 @@ sealed interface BookingContent {
 
     data class Error(val error: BookingError) : BookingContent
 
-    /** Pistas con algún hueco libre o propio en la franja elegida; vacía si no queda ninguno. */
-    data class Loaded(val courts: List<CourtSlots>) : BookingContent
+    /**
+     * Pistas con algún hueco libre o propio en la franja elegida; vacía si no queda ninguno. [times] son los mismos
+     * huecos agrupados por hora, para la vista [BookingView.Times].
+     */
+    data class Loaded(val courts: List<CourtSlots>, val times: List<TimeSlots>) : BookingContent
 
     /** Día aún no abierto en la web: en lugar de la parrilla, el formulario para programar la reserva. */
     data class Schedule(val form: ScheduleForm) : BookingContent
@@ -54,6 +58,13 @@ sealed interface BookingContent {
 sealed interface BookingMessage {
     /** Programada; se intentará reservar en [opensAt]. */
     data class Scheduled(val opensAt: Instant) : BookingMessage
+}
+
+/** Cómo se enseñan los huecos de un día abierto: tarjeta por pista o tarjeta por hora. */
+enum class BookingView {
+    /** La de por defecto: lo habitual es buscar a qué hora se puede jugar, más que en qué pista. */
+    Times,
+    Courts
 }
 
 /** Hueco elegido por el usuario. */
@@ -103,6 +114,7 @@ data class BookingUiState(
     val dayPart: DayPart,
     /** Minutos que se quieren reservar: solo se ofrecen los huecos donde caben. */
     val durationMinutes: Int = DEFAULT_DURATION,
+    val view: BookingView = BookingView.Times,
     val content: BookingContent = BookingContent.Loading,
     val sheet: ReservationSheet? = null,
     /** Para el saludo; `null` hasta que llegan los datos del perfil. */
@@ -177,6 +189,11 @@ class BookingViewModel @Inject constructor(
     fun onDurationSelect(minutes: Int) {
         _uiState.update { it.copy(durationMinutes = minutes) }
         refreshShownDay()
+    }
+
+    /** Solo cambia cómo se ve: no hace falta recalcular nada. */
+    fun onViewSelect(view: BookingView) {
+        _uiState.update { it.copy(view = view) }
     }
 
     /** Día abierto: su parrilla. Día cerrado: el formulario de programar, con la parrilla de una semana antes. */
@@ -374,7 +391,7 @@ class BookingViewModel @Inject constructor(
             val courts = SlotCalculator.slots(timetable, state.durationMinutes)
                 .map { court -> court.copy(slots = court.slots.filter { DayPart.of(it.time) == state.dayPart }) }
                 .filter { court -> court.slots.any { it.state == SlotState.Free || it.state == SlotState.Mine } }
-            state.copy(content = BookingContent.Loaded(courts))
+            state.copy(content = BookingContent.Loaded(courts, SlotCalculator.byTime(courts)))
         }
     }
 

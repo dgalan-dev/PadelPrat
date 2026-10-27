@@ -5,6 +5,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 
 private val LightColorScheme = lightColorScheme(
     primary = primaryLight,
@@ -84,11 +85,17 @@ private val DarkColorScheme = darkColorScheme(
     surfaceDim = surfaceDimDark
 )
 
+private val LightPadelColors = lightPadelColors(LightColorScheme)
+private val DarkPadelColors = darkPadelColors(DarkColorScheme)
+
 @Composable
 fun PadelPratTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
-    MaterialTheme(
-        colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme,
-        typography = Typography,
-        content = content
-    )
+    CompositionLocalProvider(LocalPadelColors provides if (darkTheme) DarkPadelColors else LightPadelColors) {
+        MaterialTheme(
+            colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme,
+            shapes = Shapes,
+            typography = Typography,
+            content = content
+        )
+    }
 }

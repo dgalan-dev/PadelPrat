@@ -1,14 +1,6 @@
 package com.dgalan.padelprat.feature.reservations
 
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,11 +12,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -34,7 +26,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -49,15 +40,12 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
@@ -70,22 +58,34 @@ import com.dgalan.padelprat.data.reservations.Reservation
 import com.dgalan.padelprat.data.reservations.ReservationCourt
 import com.dgalan.padelprat.data.reservations.ReservationStatus
 import com.dgalan.padelprat.data.scheduled.ScheduledBooking
+import com.dgalan.padelprat.ui.components.CourtName
+import com.dgalan.padelprat.ui.components.MessageState
+import com.dgalan.padelprat.ui.components.PadelCard
 import com.dgalan.padelprat.ui.components.PillSwitch
+import com.dgalan.padelprat.ui.components.ShimmerBox
+import com.dgalan.padelprat.ui.components.Tag
+import com.dgalan.padelprat.ui.format.hourText
+import com.dgalan.padelprat.ui.format.longDate
+import com.dgalan.padelprat.ui.format.openingText
+import com.dgalan.padelprat.ui.format.shortName
 import com.dgalan.padelprat.ui.theme.PadelPratTheme
+import com.dgalan.padelprat.ui.theme.padelColors
 import java.time.Duration
-import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
-import java.time.format.TextStyle
-import java.util.Locale
 
+/** [onBookClick] lleva a la pestaña Reservar (desde la lista vacía). */
 @Composable
-fun ReservationsScreen(modifier: Modifier = Modifier, viewModel: ReservationsViewModel = hiltViewModel()) {
+fun ReservationsScreen(
+    onBookClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    viewModel: ReservationsViewModel = hiltViewModel()
+) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     ReservationsContent(
         uiState = uiState,
+        onBookClick = onBookClick,
         onTabSelect = viewModel::onTabSelect,
         onCancelClick = viewModel::onCancelClick,
         onScheduleCancel = viewModel::onScheduleCancel,
@@ -110,6 +110,7 @@ fun ReservationsScreen(modifier: Modifier = Modifier, viewModel: ReservationsVie
 @Composable
 private fun ReservationsContent(
     uiState: ReservationsUiState,
+    onBookClick: () -> Unit,
     onTabSelect: (ReservationsTab) -> Unit,
     onCancelClick: (Reservation) -> Unit,
     onScheduleCancel: (String) -> Unit,
@@ -131,7 +132,7 @@ private fun ReservationsContent(
     val tabLabels = ReservationsTab.entries.associateWith { stringResource(it.labelRes()) }
 
     Box(modifier = modifier.fillMaxSize()) {
-        Column(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
             Text(
                 text = stringResource(R.string.reservations_title),
                 style = MaterialTheme.typography.headlineSmall,
@@ -154,16 +155,19 @@ private fun ReservationsContent(
                 when (val content = uiState.content) {
                     ReservationsContent.Loading -> SkeletonList()
 
-                    is ReservationsContent.Error -> MessageState(
-                        message = stringResource(
-                            if (content.error == ReservationsError.Network) {
-                                R.string.reservations_error_network
-                            } else {
-                                R.string.reservations_error_unknown
-                            }
-                        ),
-                        action = { Button(onClick = onRetry) { Text(stringResource(R.string.booking_retry)) } }
-                    )
+                    is ReservationsContent.Error -> {
+                        val network = content.error == ReservationsError.Network
+                        ScrollableMessage(
+                            icon = R.drawable.ic_error,
+                            title = stringResource(
+                                if (network) R.string.error_network_title else R.string.reservations_error_unknown
+                            ),
+                            message = stringResource(
+                                if (network) R.string.error_network_text else R.string.error_unknown_text
+                            ),
+                            action = { Button(onClick = onRetry) { Text(stringResource(R.string.booking_retry)) } }
+                        )
+                    }
 
                     is ReservationsContent.Loaded ->
                         ReservationList(
@@ -172,7 +176,8 @@ private fun ReservationsContent(
                             scheduled = uiState.scheduled,
                             onCancelClick = onCancelClick,
                             onScheduleCancel = onScheduleCancel,
-                            onScheduleTest = onScheduleTest
+                            onScheduleTest = onScheduleTest,
+                            onBookClick = onBookClick
                         )
                 }
             }
@@ -193,7 +198,8 @@ private fun ReservationList(
     scheduled: List<ScheduledBooking>,
     onCancelClick: (Reservation) -> Unit,
     onScheduleCancel: (String) -> Unit,
-    onScheduleTest: (String) -> Unit
+    onScheduleTest: (String) -> Unit,
+    onBookClick: () -> Unit
 ) {
     val reservations = when (tab) {
         ReservationsTab.Upcoming -> content.upcoming
@@ -203,7 +209,18 @@ private fun ReservationList(
     // Las programadas solo en Próximas, encima de las reservas reales
     val shownScheduled = if (tab == ReservationsTab.Upcoming) scheduled else emptyList()
     if (reservations.isEmpty() && shownScheduled.isEmpty()) {
-        MessageState(message = stringResource(tab.emptyRes()))
+        // En Próximas, el siguiente paso es reservar
+        val upcoming = tab == ReservationsTab.Upcoming
+        ScrollableMessage(
+            icon = R.drawable.ic_ball,
+            title = stringResource(tab.emptyRes()),
+            message = if (upcoming) stringResource(R.string.reservations_empty_upcoming_text) else null,
+            action = if (upcoming) {
+                { Button(onClick = onBookClick) { Text(stringResource(R.string.reservations_book)) } }
+            } else {
+                null
+            }
+        )
         return
     }
     LazyColumn(
@@ -233,11 +250,12 @@ private fun ReservationList(
 
 @Composable
 private fun UpcomingCard(reservation: Reservation, highlighted: Boolean, onCancelClick: (Reservation) -> Unit) {
-    val (lime, onLime) = limeColors()
-    ReservationCard(border = if (highlighted) BorderStroke(2.dp, lime) else null) {
+    val lime = MaterialTheme.padelColors.accent
+    val onLime = MaterialTheme.padelColors.onAccent
+    ReservationCard(border = if (highlighted) BorderStroke(2.dp, lime) else defaultCardBorder()) {
         if (highlighted) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Tag(text = reservation.start.toLocalDate().dayTag(), background = lime, content = onLime)
+                Tag(text = reservation.start.toLocalDate().dayTag(), containerColor = lime, contentColor = onLime)
                 Spacer(Modifier.weight(1f))
                 Text(
                     text = reservation.start.timeUntil(),
@@ -257,7 +275,14 @@ private fun UpcomingCard(reservation: Reservation, highlighted: Boolean, onCance
             style = if (highlighted) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.titleLarge,
             color = MaterialTheme.colorScheme.onSurface
         )
-        reservation.court?.let { CourtLine(it) }
+        reservation.court?.let {
+            CourtName(
+                name = it.name,
+                sponsor = it.sponsor,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
         if (reservation.canCancel) {
             OutlinedButton(onClick = { onCancelClick(reservation) }, modifier = Modifier.padding(top = 4.dp)) {
                 Text(stringResource(R.string.reservations_cancel))
@@ -300,8 +325,8 @@ private fun ScheduledCard(booking: ScheduledBooking, onCancelClick: () -> Unit, 
             Spacer(Modifier.width(6.dp))
             Tag(
                 text = stringResource(R.string.reservations_scheduled_tag),
-                background = scheme.secondaryContainer,
-                content = scheme.onSecondaryContainer
+                containerColor = scheme.secondaryContainer,
+                contentColor = scheme.onSecondaryContainer
             )
             Spacer(Modifier.weight(1f))
             Text(
@@ -311,7 +336,7 @@ private fun ScheduledCard(booking: ScheduledBooking, onCancelClick: () -> Unit, 
             )
         }
         Text(
-            text = "${booking.start.format(TIME_FORMAT)} – ${booking.end.format(TIME_FORMAT)}",
+            text = "${booking.start.hourText()} – ${booking.end.hourText()}",
             style = MaterialTheme.typography.titleLarge,
             color = scheme.onSurface
         )
@@ -364,7 +389,7 @@ private fun PastCard(reservation: Reservation) {
 @Composable
 private fun CancelledCard(reservation: Reservation) {
     val scheme = MaterialTheme.colorScheme
-    ReservationCard(color = scheme.surfaceContainer) {
+    ReservationCard(color = MaterialTheme.padelColors.cardMuted) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 text = reservation.start.toLocalDate().longDate(),
@@ -374,8 +399,8 @@ private fun CancelledCard(reservation: Reservation) {
             )
             Tag(
                 text = stringResource(R.string.reservations_cancelled_tag),
-                background = scheme.errorContainer,
-                content = scheme.onErrorContainer
+                containerColor = scheme.errorContainer,
+                contentColor = scheme.onErrorContainer
             )
         }
         Text(
@@ -389,68 +414,19 @@ private fun CancelledCard(reservation: Reservation) {
 @Composable
 private fun ReservationCard(
     modifier: Modifier = Modifier,
-    border: BorderStroke? = null,
-    color: Color = MaterialTheme.colorScheme.surfaceContainerLowest,
+    border: BorderStroke? = defaultCardBorder(),
+    color: Color = MaterialTheme.padelColors.card,
     content: @Composable () -> Unit
 ) {
-    Surface(
-        shape = RoundedCornerShape(24.dp),
-        color = color,
-        border = border ?: BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        modifier = modifier.fillMaxWidth()
-    ) {
+    PadelCard(modifier = modifier, color = color, border = border) {
         Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             content()
         }
     }
 }
 
-/** Pista con su patrocinador al lado, más pequeño y en azul, como en la parrilla. */
 @Composable
-private fun CourtLine(court: ReservationCourt) {
-    Row {
-        Text(
-            text = court.name,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.alignByBaseline()
-        )
-        court.sponsor?.let {
-            Spacer(Modifier.width(6.dp))
-            Text(
-                text = it,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.alignByBaseline()
-            )
-        }
-    }
-}
-
-@Composable
-private fun Tag(text: String, background: Color, content: Color) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.labelMedium,
-        color = content,
-        modifier = Modifier
-            .background(background, RoundedCornerShape(8.dp))
-            .padding(horizontal = 10.dp, vertical = 3.dp)
-    )
-}
-
-/** Lima de bola. En oscuro tertiaryContainer es un oliva apagado; tertiary mantiene el lima. */
-@Composable
-private fun limeColors() = MaterialTheme.colorScheme.let { scheme ->
-    if (isSystemInDarkTheme()) {
-        scheme.tertiary to scheme.onTertiary
-    } else {
-        scheme.tertiaryContainer to
-            scheme.onTertiaryContainer
-    }
-}
+private fun defaultCardBorder(): BorderStroke? = MaterialTheme.padelColors.cardBorder?.let { BorderStroke(1.dp, it) }
 
 /** Confirmación antes de anular, como pide la web. Mientras se anula no se puede cerrar ni volver a pulsar. */
 @Composable
@@ -489,82 +465,43 @@ private fun CancelReservationDialog(dialog: CancelDialog, onConfirm: () -> Unit,
     )
 }
 
-/** Siluetas de tarjetas mientras carga, con un brillo que las recorre. */
+/** Siluetas de tarjetas mientras carga. */
 @Composable
 private fun SkeletonList() {
-    val transition = rememberInfiniteTransition(label = "skeleton")
-    val shimmer by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(durationMillis = 1200, easing = LinearEasing), RepeatMode.Restart),
-        label = "shimmer"
-    )
-    val base = MaterialTheme.colorScheme.surfaceVariant
-    val highlight = MaterialTheme.colorScheme.surfaceContainerLowest
-    // El valor se lee al dibujar: el brillo solo repinta, no recompone
-    val placeholder = Modifier.drawBehind {
-        val x = shimmer * size.width * 3f - size.width
-        drawRoundRect(
-            brush = Brush.linearGradient(listOf(base, highlight, base), Offset(x, 0f), Offset(x + size.width, 0f)),
-            cornerRadius = CornerRadius(8.dp.toPx())
-        )
-    }
     Column(
         modifier = Modifier.padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         repeat(3) {
             ReservationCard {
-                Box(Modifier.width(110.dp).height(14.dp).then(placeholder))
-                Box(Modifier.width(180.dp).height(26.dp).then(placeholder))
-                Box(Modifier.width(140.dp).height(14.dp).then(placeholder))
+                ShimmerBox(Modifier.width(110.dp).height(14.dp))
+                ShimmerBox(Modifier.width(180.dp).height(26.dp))
+                ShimmerBox(Modifier.width(140.dp).height(14.dp))
             }
         }
     }
 }
 
-/** Mensaje centrado. Usa una lista para que también se pueda tirar hacia abajo para refrescar. */
+/** [MessageState] dentro de una lista, para que también se pueda tirar hacia abajo para refrescar. */
 @Composable
-private fun MessageState(message: String, action: (@Composable () -> Unit)? = null) {
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 32.dp, vertical = 48.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        item {
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
-            )
-            if (action != null) {
-                Spacer(Modifier.height(16.dp))
-                action()
-            }
-        }
+private fun ScrollableMessage(
+    icon: Int,
+    title: String,
+    message: String? = null,
+    action: (@Composable () -> Unit)? = null
+) {
+    LazyColumn(modifier = Modifier.fillMaxSize()) {
+        item { MessageState(icon = icon, title = title, message = message, action = action) }
     }
 }
 
-private val SPANISH = Locale.forLanguageTag("es-ES")
-private val TIME_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
-private val LONG_DATE: DateTimeFormatter = DateTimeFormatter.ofPattern("EEEE, d 'de' MMMM", SPANISH)
-
-private val OPENING_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("EEEE d 'a las' H:mm", SPANISH)
-
-/** "el sábado 24 a las 9:00". */
-private fun Instant.openingText(): String = atZone(Syltek.ZONE).format(OPENING_FORMAT)
-
-private fun Reservation.timeRange(): String = "${start.format(TIME_FORMAT)} – ${end.format(TIME_FORMAT)}"
+private fun Reservation.timeRange(): String = "${start.toLocalTime().hourText()} – ${end.toLocalTime().hourText()}"
 
 @Composable
 private fun Reservation.durationAndTotal(): String = listOfNotNull(
     stringResource(R.string.booking_duration, durationMinutes),
     total
 ).joinToString(" · ")
-
-/** "Sábado, 24 de octubre". */
-private fun LocalDate.longDate(): String = format(LONG_DATE).replaceFirstChar { it.titlecase(SPANISH) }
 
 /** "Hoy", "Mañana" o "Lun 26". */
 @Composable
@@ -576,9 +513,7 @@ private fun LocalDate.dayTag(): String {
         today.plusDays(1) -> stringResource(R.string.reservations_tomorrow)
 
         else -> {
-            val day = dayOfWeek.getDisplayName(TextStyle.SHORT, SPANISH).removeSuffix(".")
-                .replaceFirstChar { it.titlecase(SPANISH) }
-            "$day $dayOfMonth"
+            "${dayOfWeek.shortName()} $dayOfMonth"
         }
     }
 }
@@ -643,6 +578,7 @@ private fun ReservationsContentPreview() {
                     cancelled = emptyList()
                 )
             ),
+            onBookClick = {},
             onTabSelect = {},
             onCancelClick = {},
             onScheduleCancel = {},

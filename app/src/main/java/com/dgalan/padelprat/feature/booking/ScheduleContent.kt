@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -38,18 +37,18 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.dgalan.padelprat.R
-import com.dgalan.padelprat.core.network.Syltek
 import com.dgalan.padelprat.core.system.BatteryOptimization
 import com.dgalan.padelprat.data.booking.Court
 import com.dgalan.padelprat.data.scheduled.MAX_SCHEDULED_COURTS
+import com.dgalan.padelprat.ui.components.CourtName
+import com.dgalan.padelprat.ui.format.hourText
+import com.dgalan.padelprat.ui.format.openingText
+import com.dgalan.padelprat.ui.theme.padelColors
 import java.time.Instant
 import java.time.LocalTime
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 
 /** Formulario para programar la reserva de un día aún cerrado, como elementos de la lista de Reservar. */
 fun LazyListScope.scheduleItems(
@@ -116,7 +115,7 @@ fun LazyListScope.scheduleItems(
 @Composable
 private fun OpensInfo(opensAt: Instant, modifier: Modifier = Modifier) {
     Surface(
-        shape = RoundedCornerShape(16.dp),
+        shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.secondaryContainer,
         modifier = modifier.fillMaxWidth()
     ) {
@@ -155,7 +154,7 @@ private fun BatteryWarning(modifier: Modifier = Modifier) {
     if (!restricted) return
 
     Surface(
-        shape = RoundedCornerShape(16.dp),
+        shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.errorContainer,
         modifier = modifier.fillMaxWidth()
     ) {
@@ -192,13 +191,13 @@ private fun TimeChip(time: LocalTime, selected: Boolean, onClick: () -> Unit, mo
     Box(
         modifier = modifier
             .height(40.dp)
-            .background(if (selected) scheme.primary else scheme.surfaceVariant, RoundedCornerShape(14.dp))
+            .background(if (selected) scheme.primary else scheme.surfaceVariant, MaterialTheme.shapes.small)
             .clickable(role = Role.Button, onClick = onClick)
             .semantics { this.selected = selected },
         contentAlignment = Alignment.Center
     ) {
         Text(
-            text = time.format(TIME_FORMAT),
+            text = time.hourText(),
             style = MaterialTheme.typography.labelLarge,
             color = if (selected) scheme.onPrimary else scheme.onSurfaceVariant
         )
@@ -210,10 +209,16 @@ private fun TimeChip(time: LocalTime, selected: Boolean, onClick: () -> Unit, mo
 private fun CourtChoice(court: Court, position: Int?, enabled: Boolean, onClick: () -> Unit) {
     val scheme = MaterialTheme.colorScheme
     val description = position?.let { stringResource(R.string.schedule_court_position, court.name, it) } ?: court.name
+    val padelColors = MaterialTheme.padelColors
     Surface(
-        shape = RoundedCornerShape(16.dp),
-        color = if (position != null) scheme.primaryContainer else scheme.surfaceContainerLowest,
-        border = BorderStroke(1.dp, if (position != null) scheme.primary else scheme.outlineVariant),
+        shape = MaterialTheme.shapes.medium,
+        color = if (position != null) scheme.primaryContainer else padelColors.card,
+        // En oscuro las no elegidas van sin borde, como las tarjetas
+        border = if (position != null) {
+            BorderStroke(1.dp, scheme.primary)
+        } else {
+            padelColors.cardBorder?.let { BorderStroke(1.dp, it) }
+        },
         modifier = Modifier
             .fillMaxWidth()
             .clickable(enabled = enabled, role = Role.Checkbox, onClick = onClick)
@@ -232,25 +237,12 @@ private fun CourtChoice(court: Court, position: Int?, enabled: Boolean, onClick:
                 modifier = Modifier.size(20.dp)
             )
             Spacer(Modifier.width(12.dp))
-            Row(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = court.name,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = scheme.onSurface.copy(alpha = if (enabled) 1f else 0.4f),
-                    modifier = Modifier.alignByBaseline()
-                )
-                court.sponsor?.let {
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        text = it,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = scheme.primary.copy(alpha = if (enabled) 1f else 0.4f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.alignByBaseline()
-                    )
-                }
-            }
+            CourtName(
+                name = court.name,
+                sponsor = court.sponsor,
+                alpha = if (enabled) 1f else 0.4f,
+                modifier = Modifier.weight(1f)
+            )
             // Círculo con el orden de preferencia, o vacío si no está elegida
             Box(
                 modifier = Modifier
@@ -273,9 +265,3 @@ private fun CourtChoice(court: Court, position: Int?, enabled: Boolean, onClick:
 }
 
 private const val TIME_COLUMNS = 4
-private val TIME_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
-private val SPANISH = Locale.forLanguageTag("es-ES")
-private val OPENING_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("EEEE d 'a las' H:mm", SPANISH)
-
-/** "el sábado 24 a las 9:00". */
-internal fun Instant.openingText(): String = atZone(Syltek.ZONE).format(OPENING_FORMAT)

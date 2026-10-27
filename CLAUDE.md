@@ -34,7 +34,8 @@ Se publican en GitHub Releases (no en Google Play). Para sacar una versión: sub
   - `feature/<nombre>/`: pantallas y ViewModels de cada funcionalidad.
   - `data/<área>/`: repositorios y fuentes de datos remotas (`XxxRemoteDataSource`), con resultados como `sealed interface` (p. ej. `LoginResult`).
   - `core/network/`: cliente HTTP y sesión. `ui/theme/`: tema.
-  - `ui/components/`: componentes reutilizables entre pantallas (p. ej. `PillSwitch`, el selector de píldora de los mocks). Antes de crear uno nuevo, mirar si ya existe aquí.
+  - `ui/components/`: componentes reutilizables entre pantallas (`PillSwitch`, el selector de píldora de los mocks; `PadelCard`, `Tag`, `CourtName`, `ShimmerBox`, `MessageState`). Antes de crear uno nuevo, mirar si ya existe aquí.
+  - `ui/format/`: formato de fechas y horas de la interfaz (`hourText`, `longDate`, `openingText`, `shortName`).
 - **Backend**: no hay API propia; es la web de reservas del club (Syltek, `https://prat.syltek.com/`), replicada por ingeniería inversa. **Antes de tocar cualquier petición, leer `docs/syltek-api.md`**: rutas, formularios, selectores HTML y reglas (p. ej. la pre-reserva bloquea la pista 8 minutos, anular es un GET que no se puede reintentar).
   - Respuestas en HTML y formularios `x-www-form-urlencoded`: OkHttp directo, sin Retrofit. El HTML se lee con Jsoup, en parsers aislados (`TimetableParser`, `ReservationParsers`).
   - **Reservar** (`ReservationRepository.book`): pre-reserva, cambio de duración y confirmación seguidos, solo al pulsar "Confirmar reserva" en la hoja de la parrilla. Abrir la hoja no bloquea nada. Ningún paso se reintenta solo; si se corta al confirmar, el resultado es dudoso y se avisa. Ver `docs/plan-confirmar-reserva.md`.
@@ -59,6 +60,9 @@ Se publican en GitHub Releases (no en Google Play). Para sacar una versión: sub
 - Textos de la interfaz en `res/values/strings.xml`, en español; nada de textos fijos en el código.
 - Tema propio de Material 3 en `ui/theme/` (sin color dinámico), con modo claro y oscuro según el sistema. Usar siempre `MaterialTheme.colorScheme` y `MaterialTheme.typography`, sin colores ni tamaños de texto fijos.
   - Colores (de los mocks de diseño): primario azul `#1E4FA3` y terciario lima de bola `#B8E63A`. `Color.kt` está generado con material-color-utilities y tiene algunos tonos fijados a mano con los valores exactos del mock (ver la cabecera del archivo); para cambiarlos hay que regenerar el esquema completo, no editar tonos sueltos.
+  - Colores propios fuera del esquema de Material 3 en `PadelColors` (`MaterialTheme.padelColors`), sacados de sus tonos: huecos libres (`available`), lima intenso (`accent`), tarjetas (`card`, `cardBorder`, `cardMuted`) y cabecera fija (`pinnedHeader`). En oscuro las tarjetas van más claras que el fondo y sin borde. Si un color tiene que cambiar entre claro y oscuro, va aquí y no con `isSystemInDarkTheme()` en la pantalla (solo queda la cabecera del login).
+  - Formas en `Shape.kt` (`MaterialTheme.shapes`): `extraSmall` etiquetas, `small` chips, `medium` avisos, `large` tarjetas. Nada de `RoundedCornerShape` sueltos.
+  - La barra de estado la pinta cada pestaña (`MainScaffold` no aplica el margen superior): Reservar la pone del color de su cabecera fija y las demás usan `statusBarsPadding()`.
   - Tipografía: Montserrat (display, headline y `titleLarge`) e Inter (el resto), incluidas en `res/font/`.
 - Comentarios en español y solo cuando aporten algo que el código no dice.
 

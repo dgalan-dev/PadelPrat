@@ -13,6 +13,8 @@ ktlint_code_style = android_studio
 max_line_length = 120
 # Composable functions use PascalCase
 ktlint_function_naming_ignore_when_annotated_with = Composable
+# Colores propios del tema (ui/theme/PadelColors.kt), como los de MaterialTheme
+compose_allowed_composition_locals = LocalPadelColors
 
 [*.{yml,yaml,json}]
 indent_size = 2

@@ -32,8 +32,21 @@
     <string name="booking_duration">%1$d min</string>
     <string name="booking_empty_morning">No quedan pistas libres de %1$d min por la mañana</string>
     <string name="booking_empty_afternoon">No quedan pistas libres de %1$d min por la tarde</string>
-    <string name="booking_error_network">No hay conexión. Revisa tu internet y vuelve a intentarlo.</string>
-    <string name="booking_error_unknown">No se ha podido cargar la disponibilidad. Vuelve a intentarlo más tarde.</string>
+    <string name="booking_empty_title">No quedan pistas libres</string>
+    <string name="booking_error_unknown">No se ha podido cargar la disponibilidad</string>
+    <string name="booking_view_courts">Ver por pista</string>
+    <string name="booking_view_times">Ver por hora</string>
+    <plurals name="booking_free_courts">
+        <item quantity="one">%d pista</item>
+        <item quantity="other">%d pistas</item>
+        <item quantity="many">%d pistas</item>
+    </plurals>
+    <!-- Acción del aviso "Programada…" -->
+    <string name="booking_see_reservations">Ver</string>
+    <string name="booking_limit_see_reservations">Ver mis reservas</string>
+    <string name="error_network_title">Sin conexión</string>
+    <string name="error_network_text">Revisa tu internet y vuelve a intentarlo.</string>
+    <string name="error_unknown_text">Vuelve a intentarlo más tarde.</string>
     <string name="booking_retry">Reintentar</string>
     <string name="schedule_day_locked">Todavía no se puede reservar; se puede programar</string>
     <!-- "Este día todavía no se puede reservar. Se abre el sábado 24 a las 9:00." -->
@@ -134,19 +147,22 @@
     <string name="reservations_cancel_not_done">No se ha podido anular la reserva</string>
     <string name="reservations_cancel_uncertain">No se ha podido comprobar si se ha anulado. Revisa la lista cuando tengas conexión.</string>
     <string name="reservations_empty_upcoming">No tienes próximas reservas</string>
+    <string name="reservations_empty_upcoming_text">Cuando reserves una pista, aparecerá aquí.</string>
+    <string name="reservations_book">Reservar pista</string>
     <string name="reservations_empty_past">No tienes reservas en los últimos 6 meses</string>
     <string name="reservations_empty_cancelled">No tienes reservas anuladas</string>
-    <string name="reservations_error_network">No hay conexión. Revisa tu internet y vuelve a intentarlo.</string>
-    <string name="reservations_error_unknown">No se han podido cargar tus reservas. Vuelve a intentarlo más tarde.</string>
+    <string name="reservations_error_unknown">No se han podido cargar tus reservas</string>
     <string name="profile_title">Perfil</string>
     <string name="profile_logout">Cerrar sesión</string>
+    <string name="profile_logout_title">¿Cerrar sesión?</string>
+    <string name="profile_logout_text">Tendrás que volver a iniciar sesión. Las reservas programadas solo se harán si vuelves a entrar antes de que se abra su día.</string>
+    <string name="profile_logout_cancel">Cancelar</string>
     <string name="profile_contact">Datos de contacto</string>
     <string name="profile_phone">Teléfono</string>
     <string name="profile_address">Dirección</string>
     <string name="profile_edit_hint">Para cambiar tus datos, entra en la web del club.</string>
     <string name="profile_version">Versión %1$s</string>
-    <string name="profile_error_network">No hay conexión. Revisa tu internet y vuelve a intentarlo.</string>
-    <string name="profile_error_unknown">No se han podido cargar tus datos. Vuelve a intentarlo más tarde.</string>
+    <string name="profile_error_unknown">No se han podido cargar tus datos</string>
     <string name="update_title">Nueva versión disponible</string>
     <!-- "Ya está disponible la versión 1.1.0 (tienes la 1.0.0). Para seguir usando la app, actualízala." -->
     <string name="update_text">Ya está disponible la versión %1$s (tienes la %2$s). Para seguir usando la app, actualízala.</string>

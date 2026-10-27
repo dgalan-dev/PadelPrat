@@ -36,6 +36,11 @@ data class Slot(val start: Instant, val time: LocalTime, val state: SlotState, v
 
 data class CourtSlots(val court: Court, val slots: List<Slot>)
 
+/** Una hora de inicio con las pistas que se pueden reservar (o ya son del usuario) a esa hora. */
+data class TimeSlots(val time: LocalTime, val start: Instant, val courts: List<CourtAtTime>)
+
+data class CourtAtTime(val court: Court, val state: SlotState)
+
 /** Duraciones que permite reservar la web, en minutos, en el orden en que se muestran. */
 val BOOKING_DURATIONS = listOf(90, 60)
 
@@ -50,6 +55,20 @@ object SlotCalculator {
     fun slots(timetable: DayTimetable, durationMinutes: Int): List<CourtSlots> = timetable.courts.map { court ->
         CourtSlots(court, courtSlots(court, timetable, durationMinutes))
     }
+
+    /**
+     * Las mismas pistas agrupadas por hora, para la vista "por hora": solo las horas con alguna pista libre o propia,
+     * y en cada una esas pistas, en el orden de la parrilla.
+     */
+    fun byTime(courts: List<CourtSlots>): List<TimeSlots> = courts
+        .flatMap { courtSlots ->
+            courtSlots.slots
+                .filter { it.state == SlotState.Free || it.state == SlotState.Mine }
+                .map { slot -> slot to CourtAtTime(courtSlots.court, slot.state) }
+        }
+        .groupBy { (slot, _) -> slot.start }
+        .map { (start, pairs) -> TimeSlots(pairs.first().first.time, start, pairs.map { (_, court) -> court }) }
+        .sortedBy { it.start }
 
     private fun courtSlots(court: Court, timetable: DayTimetable, durationMinutes: Int): List<Slot> {
         val bookings = timetable.bookings.filter { it.courtId == court.id }.sortedBy { it.start }
