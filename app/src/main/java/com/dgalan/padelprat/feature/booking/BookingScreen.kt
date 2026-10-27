@@ -60,6 +60,7 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -70,6 +71,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -188,12 +190,20 @@ private fun BookingContent(
     val listState = remember(uiState.selectedDay) { LazyListState() }
     val filtersPinned by remember(listState) { derivedStateOf { listState.firstVisibleItemIndex > 0 } }
 
-    // Tarjetas que ya han hecho su entrada, por día y filtros: al volver a un día ya visto o con scroll a una tarjeta
-    // ya vista no se repite. Tras una recarga (siluetas) sí vuelven a entrar.
+    // Entrada de las tarjetas: solo las que se componen en el primer frame tras cargar, que son las que se ven. Las que
+    // llegan después con el scroll aparecen sin más. Se hace una vez por día y filtros (al volver a uno ya visto no se
+    // repite) y otra vez tras cada recarga (siluetas).
     val entranceKey = EntranceKey(uiState.selectedDay, uiState.dayPart, uiState.durationMinutes)
-    val entrancesByFilters = remember { mutableMapOf<EntranceKey, MutableSet<Int>>() }
-    if (uiState.content is BookingContent.Loading) entrancesByFilters.remove(entranceKey)
-    val playedEntrances = entrancesByFilters.getOrPut(entranceKey) { mutableSetOf() }
+    val playedEntrances = remember { mutableStateSetOf<EntranceKey>() }
+    if (uiState.content is BookingContent.Loading) SideEffect { playedEntrances.remove(entranceKey) }
+    val entranceOpen = uiState.content is BookingContent.Loaded && entranceKey !in playedEntrances
+    if (entranceOpen) {
+        LaunchedEffect(entranceKey) {
+            // Al llegar el siguiente frame, el anterior ya ha medido la lista y compuesto las tarjetas visibles
+            withFrameNanos {}
+            playedEntrances.add(entranceKey)
+        }
+    }
     // Pistas desplegadas (con las horas no disponibles a la vista); al cambiar de día o de filtros se pliegan todas
     val expandedCourts = remember(entranceKey) { mutableStateSetOf<Int>() }
     val pullState = rememberPullToRefreshState()
@@ -266,7 +276,7 @@ private fun BookingContent(
                     courtItems(
                         courts = content.courts,
                         selectedSlot = uiState.sheet?.selectedSlot,
-                        playedEntrances = playedEntrances,
+                        entranceOpen = entranceOpen,
                         expandedCourts = expandedCourts,
                         onSlotClick = onSlotClick
                     )
@@ -304,21 +314,18 @@ private fun LimitBanner(modifier: Modifier = Modifier) {
     }
 }
 
-/** Solo las primeras tarjetas entran escalonadas: las de más abajo ya aparecen al hacer scroll. */
-private const val STAGGERED_CARDS = 6
-
 private fun LazyListScope.courtItems(
     courts: List<CourtSlots>,
     selectedSlot: SelectedSlot?,
-    playedEntrances: MutableSet<Int>,
+    entranceOpen: Boolean,
     expandedCourts: MutableSet<Int>,
     onSlotClick: (courtId: Int, start: Instant) -> Unit
 ) {
     itemsIndexed(courts, key = { _, courtSlots -> courtSlots.court.id }) { index, courtSlots ->
-        val animate = index < STAGGERED_CARDS && playedEntrances.add(courtSlots.court.id)
+        // Tras las siluetas la lista siempre está arriba, así que el índice es también el orden en pantalla
         EntranceAnimation(
-            delayMillis = index * 50L,
-            animate = animate,
+            delayMillis = index * 50,
+            animate = entranceOpen,
             // Sin animateItem: con la recolocación animada, al desplegar una tarjeta las de debajo iban por detrás de su
             // crecimiento y se montaban encima; y el fundido de salida dibujaba las que se iban por encima del título.
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 5.dp)
@@ -338,16 +345,19 @@ private fun LazyListScope.courtItems(
 /** Aparece con un fundido y subiendo un poco. */
 @Composable
 private fun EntranceAnimation(
-    delayMillis: Long,
+    delayMillis: Int,
     animate: Boolean,
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
+    // Cuenta el valor de animate al entrar en la composición: al frame siguiente pasa a false y la entrada sigue
     val progress = remember { Animatable(if (animate) 0f else 1f) }
     LaunchedEffect(Unit) {
         if (progress.value < 1f) {
-            delay(delayMillis)
-            progress.animateTo(1f, tween(durationMillis = 300, easing = FastOutSlowInEasing))
+            progress.animateTo(
+                targetValue = 1f,
+                animationSpec = tween(durationMillis = 300, delayMillis = delayMillis, easing = FastOutSlowInEasing)
+            )
         }
     }
     Box(
