@@ -11,11 +11,14 @@ import androidx.core.app.ServiceCompat
 import com.dgalan.padelprat.data.reservations.ReservationsChangeNotifier
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Servicio en primer plano que intenta una reserva programada en la apertura de su día. Dura unos minutos (desde
@@ -70,7 +73,18 @@ class ScheduledBookingService : Service() {
                         ScheduledBookingNotifications.RUNNING_NOTIFICATION_ID,
                         notifications.running(booking, dryRun)
                     )
-                val run = runner.run(booking, dryRun, onBookingStart = { repository.markBookingStarted(booking.id) })
+                var started = false
+                val run = try {
+                    runner.run(booking, dryRun, onBookingStart = {
+                        started = true
+                        repository.markBookingStarted(booking.id)
+                    })
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    // Un fallo inesperado no debe cerrar la app sin avisar. Si ya se estaba reservando, puede estar hecha
+                    ScheduledRun(if (started) ScheduledRunResult.Uncertain else ScheduledRunResult.Failed, null)
+                }
                 notifications.showResult(booking, run)
                 // La programación ya se ha intentado: se quita (en modo de prueba se deja para poder repetirla)
                 if (!dryRun) {
@@ -78,9 +92,13 @@ class ScheduledBookingService : Service() {
                     changeNotifier.notifyChanged()
                 }
             } finally {
-                registry.finish(bookingId)
-                running--
-                stopIfIdle()
+                // En el hilo principal, como onStartCommand: así el contador no se pisa y no se para el servicio justo
+                // cuando acaba de lanzarse otra programación
+                withContext(NonCancellable + Dispatchers.Main) {
+                    registry.finish(bookingId)
+                    running--
+                    stopIfIdle()
+                }
             }
         }
         // Si el sistema mata el servicio no se reintenta solo: una reserva a medias no se repite

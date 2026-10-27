@@ -28,11 +28,16 @@ apertura, y **respeta el límite** de 2 reservas activas del club.
    5…"). Una consulta para leer `nowUtc` y calcular el desfase entre el reloj del móvil y el del club. Con
    "Fecha y hora automáticas" suele ser de menos de un segundo; si pasa de 30 s, la notificación del resultado
    avisa de que el reloj del móvil está desajustado (la reserva se hace igual, esperando según la hora del club).
-4. **Esperar a las 9:00:00 del club** y desde ahí consultar el día cada segundo, como mucho 2 minutos, hasta
-   que la parrilla aparezca (normalmente al primer o segundo intento).
+4. **Esperar a las 8:59:58 del club** y desde ahí consultar el día, como mucho 2 minutos, hasta que la
+   parrilla aparezca: cada 250 ms hasta las 9:00:05 y luego cada segundo. Se empieza 2 s antes porque
+   `nowUtc` viene sin milisegundos y el desfase medido puede quedarse corto hasta un segundo; un día aún
+   cerrado responde sin parrilla, así que consultar antes no reserva nada. Las consultas van de una en una.
 5. **Reservar** en cuanto el día aparece: el flujo de siempre (pre-reserva, duración, confirmación con "Pagar
    en el club" y comprobación del mensaje de éxito). Si la primera pista no está libre a esa hora, la segunda,
    y luego la tercera. Nunca más de una reserva por programación. Tarda 1–2 s tras la apertura.
+   Si se corta al confirmar, se mira en Mis reservas (hasta 3 veces, cada 3 s) si sale hecha a esa hora, con esa
+   duración y en esa pista: si sale, se avisa de que está reservada; si no, de que hay que comprobarlo. Solo
+   cambia el aviso: nunca se prueba otra pista, porque el listado puede tardar en mostrar la reserva.
 6. **Avisar** con una notificación del resultado ("Reservada la Pista 2 el jueves 5 a las 18:30" o el motivo
    de que no se haya podido).
 
@@ -60,8 +65,8 @@ apertura, y **respeta el límite** de 2 reservas activas del club.
    cancelarlas. Se guardan en DataStore como JSON. Todavía no se ejecutan.
 2. **El motor** — hecha (23/10/2026): `ScheduledBookingAlarms` (`setAlarmClock` a las 8:58), `ScheduledBookingReceiver`,
    `ScheduledBookingService` (primer plano `dataSync` + wake lock de 6 min como máximo), `ScheduledBookingRunner`
-   (sesión, límite, desfase del reloj, espera a las 9:00 del club, consulta cada segundo 2 min, reserva por orden de
-   pistas) y `ScheduledBookingNotifications`. Probado en el móvil con el modo de prueba de debug ("Probar ahora" en
+   (sesión, límite, desfase del reloj, espera a las 8:59:58 del club, consulta cada 250 ms y luego cada segundo
+   2 min, reserva por orden de pistas) y `ScheduledBookingNotifications`. Probado en el móvil con el modo de prueba de debug ("Probar ahora" en
    la tarjeta programada: usa el día de la semana anterior y para antes de la pre-reserva): alarma exacta
    registrada, servicio, salto a la siguiente pista y notificaciones. **Falta la primera reserva real a las 9:00.**
 3. **Permisos y robustez** — hecha (23/10/2026):

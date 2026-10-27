@@ -53,8 +53,9 @@ data class ScheduledRun(val result: ScheduledRunResult, val clockOffset: Duratio
  * Intenta una reserva programada en la apertura de su día (ver docs/plan-reserva-programada.md):
  * 1. comprueba la sesión y el límite de reservas del club;
  * 2. mide el desfase entre el reloj del móvil y el del club con una consulta;
- * 3. espera a la hora de apertura según el reloj del club;
- * 4. consulta el día cada segundo hasta que la web lo abre (como mucho [OPEN_TIMEOUT]);
+ * 3. espera hasta [POLL_EARLY] antes de la apertura según el reloj del club;
+ * 4. consulta el día hasta que la web lo abre (como mucho [OPEN_TIMEOUT]): cada [FAST_POLL_INTERVAL] hasta
+ *    [FAST_POLL_WINDOW] después de la apertura y luego cada [POLL_INTERVAL];
  * 5. reserva la primera pista libre a esa hora, por orden de preferencia, con el flujo normal de la app.
  *
  * Nunca hace más de una reserva y no reintenta si el resultado es dudoso, para no duplicarla.
@@ -82,14 +83,18 @@ class ScheduledBookingRunner @Inject constructor(
         val warning = offset?.takeIf { abs(it.seconds) >= CLOCK_WARNING.seconds }
         val targetDay = if (dryRun) booking.date.minusDays(Syltek.BOOKING_OPENS_DAYS_BEFORE) else booking.date
 
+        // La apertura según el reloj del móvil, corregido con el desfase medido
+        val opensAtLocal = booking.opensAt.minus(offset ?: Duration.ZERO)
         if (!dryRun) {
-            // Hasta la apertura según el reloj del club (el del móvil corregido con el desfase medido)
-            val serverNow = Instant.now().plus(offset ?: Duration.ZERO)
-            val wait = Duration.between(serverNow, booking.opensAt)
+            // Se empieza a consultar un poco antes: `nowUtc` viene sin milisegundos y el desfase puede quedarse corto
+            // hasta un segundo. Un día aún cerrado responde sin parrilla, así que consultar antes no reserva nada
+            val wait = Duration.between(Instant.now(), opensAtLocal.minus(POLL_EARLY))
             if (!wait.isNegative) delay(wait.toMillis())
         }
 
-        val timetable = waitUntilOpen(targetDay) ?: return ScheduledRun(ScheduledRunResult.NotOpened, warning)
+        val fastUntil = if (dryRun) Instant.MIN else opensAtLocal.plus(FAST_POLL_WINDOW)
+        val timetable = waitUntilOpen(targetDay, fastUntil)
+            ?: return ScheduledRun(ScheduledRunResult.NotOpened, warning)
         val slots = SlotCalculator.slots(timetable, booking.durationMinutes)
         val start = booking.date.atTime(booking.start).atZone(Syltek.ZONE).toInstant()
         val dryRunStart = targetDay.atTime(booking.start).atZone(Syltek.ZONE).toInstant()
@@ -108,9 +113,19 @@ class ScheduledBookingRunner @Inject constructor(
                 // Otro socio se adelantó o la web no deja esa pista: a por la siguiente
                 ReservationResult.SlotUnavailable, is ReservationResult.Rejected -> continue
 
-                // Puede que esté hecha: no se prueba otra pista para no reservar dos veces
-                ReservationResult.Uncertain, ReservationResult.Incomplete ->
-                    return ScheduledRun(ScheduledRunResult.Uncertain, warning)
+                // Se cortó al confirmar: se mira en Mis reservas si está hecha, pero solo para el aviso. Si no aparece
+                // no se prueba otra pista, porque el listado puede tardar en mostrarla y se reservaría dos veces
+                ReservationResult.Uncertain -> return ScheduledRun(
+                    if (appearsBooked(booking, court)) {
+                        ScheduledRunResult.Booked(court, dryRun = false)
+                    } else {
+                        ScheduledRunResult.Uncertain
+                    },
+                    warning
+                )
+
+                // La web pidió un paso más: no se comprueba en el listado, donde podría salir a medias
+                ReservationResult.Incomplete -> return ScheduledRun(ScheduledRunResult.Uncertain, warning)
 
                 ReservationResult.SessionExpired -> return ScheduledRun(ScheduledRunResult.LoggedOut, warning)
 
@@ -119,6 +134,20 @@ class ScheduledBookingRunner @Inject constructor(
             }
         }
         return ScheduledRun(ScheduledRunResult.NoCourtFree, warning)
+    }
+
+    /**
+     * Si una reserva dudosa sale hecha en Mis reservas, a su hora, con su duración y en la pista que se estaba
+     * reservando. Solo lee. Lo mira [VERIFY_ATTEMPTS] veces, por si la conexión tarda en volver.
+     */
+    private suspend fun appearsBooked(booking: ScheduledBooking, court: ScheduledCourt): Boolean {
+        val start = booking.date.atTime(booking.start)
+        repeat(VERIFY_ATTEMPTS) {
+            delay(VERIFY_DELAY.toMillis())
+            val booked = reservationsRepository.bookedCourt(start, booking.durationMinutes)
+            if (booked != null) return booked.name.equals(court.name, ignoreCase = true)
+        }
+        return false
     }
 
     /**
@@ -134,15 +163,18 @@ class ScheduledBookingRunner @Inject constructor(
         return Duration.between(localMiddle, serverNow)
     }
 
-    /** Consulta el día cada segundo hasta que la web trae su parrilla, como mucho [OPEN_TIMEOUT]. */
-    private suspend fun waitUntilOpen(day: LocalDate): DayTimetable? {
+    /**
+     * Consulta el día hasta que la web trae su parrilla, como mucho [OPEN_TIMEOUT]: más a menudo hasta [fastUntil]
+     * (hora del móvil) y luego cada [POLL_INTERVAL]. Las consultas van de una en una, nunca en paralelo.
+     */
+    private suspend fun waitUntilOpen(day: LocalDate, fastUntil: Instant): DayTimetable? {
         val deadline = Instant.now().plus(OPEN_TIMEOUT)
         while (Instant.now() < deadline) {
             // Un día aún cerrado responde sin parrilla (UnknownError); sin conexión también se sigue intentando
             when (val result = timetableRepository.timetable(day)) {
                 is TimetableResult.Success -> return result.timetable
                 TimetableResult.SessionExpired -> return null
-                else -> delay(POLL_INTERVAL.toMillis())
+                else -> delay((if (Instant.now() < fastUntil) FAST_POLL_INTERVAL else POLL_INTERVAL).toMillis())
             }
         }
         return null
@@ -153,6 +185,17 @@ class ScheduledBookingRunner @Inject constructor(
         val WAKE_UP_BEFORE: Duration = Duration.ofMinutes(2)
         val OPEN_TIMEOUT: Duration = Duration.ofMinutes(2)
         val POLL_INTERVAL: Duration = Duration.ofSeconds(1)
+
+        /** Cuánto antes de la apertura se empieza a consultar: cubre el segundo que se pierde al medir el desfase. */
+        val POLL_EARLY: Duration = Duration.ofSeconds(2)
+
+        /** Alrededor de la apertura se consulta más a menudo, para reservar en cuanto se abra. */
+        val FAST_POLL_INTERVAL: Duration = Duration.ofMillis(250)
+        val FAST_POLL_WINDOW: Duration = Duration.ofSeconds(5)
+
+        /** Comprobación en Mis reservas de un resultado dudoso. */
+        const val VERIFY_ATTEMPTS = 3
+        val VERIFY_DELAY: Duration = Duration.ofSeconds(3)
 
         /** A partir de este desfase se avisa de que el reloj del móvil está desajustado. */
         val CLOCK_WARNING: Duration = Duration.ofSeconds(30)

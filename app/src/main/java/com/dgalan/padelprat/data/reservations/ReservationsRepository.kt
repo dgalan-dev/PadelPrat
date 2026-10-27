@@ -95,6 +95,21 @@ class ReservationsRepository @Inject constructor(
     }
 
     /**
+     * Pista de la reserva activa que empieza a [start] (hora del club) y dura [durationMinutes], según el listado y su
+     * detalle. Solo lee. `null` si no aparece o no se ha podido comprobar, lo que no quiere decir que no esté hecha:
+     * el listado puede tardar en mostrarla.
+     */
+    suspend fun bookedCourt(start: LocalDateTime, durationMinutes: Int): ReservationCourt? {
+        val list = remote.list() as? ReservationsStep.Ok ?: return null
+        updateActiveCount(list.value)
+        val reservation = list.value.firstOrNull {
+            it.upcoming && it.status == ReservationStatus.Booked && it.start == start &&
+                it.durationMinutes == durationMinutes
+        } ?: return null
+        return remote.court(reservation.id)
+    }
+
+    /**
      * Anula una reserva y comprueba el resultado recargando el listado, como pide la web (ver docs/syltek-api.md,
      * apartado 6.3). La petición de anular se lanza una sola vez: nunca se reintenta.
      */
