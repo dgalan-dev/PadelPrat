@@ -33,9 +33,14 @@ class UpdateRepository @Inject constructor(
             return null
         }
         val update = latest?.takeIf { isNewerVersion(it.version, BuildConfig.VERSION_NAME) }
-        // Ya actualizada: se borra el APK que se descargó para instalar esta versión
-        if (update == null) withContext(Dispatchers.IO) { directory.deleteRecursively() }
+        // Ya actualizada: se borra el APK que se descargó para instalar esta versión, por si no se borró al instalarla
+        if (update == null) deleteDownloads()
         return update
+    }
+
+    /** Borra los APK descargados. Se llama justo después de instalar una versión (desde `RescheduleReceiver`). */
+    suspend fun deleteDownloads() {
+        withContext(Dispatchers.IO) { directory.deleteRecursively() }
     }
 
     /** El APK descargado y comprobado, o `null` si la descarga ha fallado. Si ya estaba descargado, no se repite. */
