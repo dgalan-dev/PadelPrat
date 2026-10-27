@@ -52,6 +52,7 @@ Se publican en GitHub Releases (no en Google Play). Para sacar una versión: sub
   - Actualización obligatoria (`data/update/`, `feature/update/`): `UpdateRepository.check()` consulta `releases/latest` de la API pública de GitHub (cliente propio `@GitHubClient`, sin cookies; unos 6 KB y máximo 5 s, con la pantalla de arranque esperando). Si `tag_name` es más nueva que `versionName`, `MainActivity` muestra `ForceUpdateScreen` en lugar de la app, sin opción de saltarla. Si no se puede comprobar, se entra igual. En debug no se comprueba (otra firma). El APK se descarga a `cacheDir/update`, se comprueba el tamaño y el SHA-256 (`digest` de GitHub) y se instala con `PackageInstaller` (`AppInstaller` + `UpdateInstallReceiver`). Hace falta el permiso "Instalar apps desconocidas" (`UnknownSources`). No se instala mientras haya una reserva programada en curso (`ScheduledRunRegistry.runningIds`). Al actualizar, `RescheduleReceiver` vuelve a poner las alarmas.
   - **Al investigar páginas nuevas de la web con la sesión del usuario: registrar solo la estructura (etiquetas, tipos de elemento, longitudes), nunca los valores**, y quitar el log y borrar el registro del móvil al terminar.
 - El login no tiene registro.
+- Solo en vertical: `MainActivity` lleva `screenOrientation="portrait"` en el manifest. En móviles se respeta; en pantallas grandes (ancho mínimo ≥ 600 dp) Android 16 lo ignora al apuntar a la API 36 o más, así que en tablets y plegables abiertos gira igual.
 
 ## Convenciones
 
