@@ -1,5 +1,6 @@
 package com.dgalan.padelprat.feature.reservations
 
+import android.content.Intent
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -43,6 +44,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -64,6 +66,7 @@ import com.dgalan.padelprat.ui.components.PadelCard
 import com.dgalan.padelprat.ui.components.PillSwitch
 import com.dgalan.padelprat.ui.components.ShimmerBox
 import com.dgalan.padelprat.ui.components.Tag
+import com.dgalan.padelprat.ui.format.SPANISH
 import com.dgalan.padelprat.ui.format.hourText
 import com.dgalan.padelprat.ui.format.longDate
 import com.dgalan.padelprat.ui.format.openingText
@@ -283,13 +286,48 @@ private fun UpcomingCard(reservation: Reservation, highlighted: Boolean, onCance
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-        if (reservation.canCancel) {
-            OutlinedButton(onClick = { onCancelClick(reservation) }, modifier = Modifier.padding(top = 4.dp)) {
-                Text(stringResource(R.string.reservations_cancel))
+        val context = LocalContext.current
+        val shareText = reservation.shareText()
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 4.dp)) {
+            OutlinedButton(onClick = { context.startActivity(shareIntent(shareText)) }) {
+                Text(stringResource(R.string.reservations_share))
+            }
+            if (reservation.canCancel) {
+                OutlinedButton(onClick = { onCancelClick(reservation) }) {
+                    Text(stringResource(R.string.reservations_cancel))
+                }
             }
         }
     }
 }
+
+/**
+ * Texto para compartir, en varias líneas y con emojis pero sin el formato de WhatsApp (`*negrita*`), que en otras
+ * apps se vería con los asteriscos. La pista (con su patrocinador, si lo tiene), solo si se ha podido leer.
+ */
+@Composable
+private fun Reservation.shareText(): String {
+    val day = start.toLocalDate().longDate().replaceFirstChar { it.lowercase(SPANISH) }
+    return listOfNotNull(
+        stringResource(R.string.reservations_share_day, day),
+        stringResource(
+            R.string.reservations_share_time,
+            start.toLocalTime().hourText(),
+            end.toLocalTime().hourText(),
+            durationMinutes
+        ),
+        court?.let { court ->
+            court.sponsor?.let { stringResource(R.string.reservations_share_court_sponsor, court.name, it) }
+                ?: stringResource(R.string.reservations_share_court, court.name)
+        }
+    ).joinToString("\n")
+}
+
+/** El menú de compartir del sistema, con el texto ya escrito. */
+private fun shareIntent(text: String): Intent = Intent.createChooser(
+    Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text),
+    null
+)
 
 /**
  * Reserva programada: todavía no es una reserva. Se distingue de las reales con el borde discontinuo, el reloj y la

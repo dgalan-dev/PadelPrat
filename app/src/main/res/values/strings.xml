@@ -138,6 +138,11 @@
     <string name="reservations_scheduled_test">Probar ahora</string>
     <string name="reservations_scheduled_test_queued">Prueba en 15 s (sin reservar). Mira la notificación.</string>
     <string name="reservations_cancel">Anular</string>
+    <string name="reservations_share">Compartir</string>
+    <string name="reservations_share_day">🎾 Pádel · %1$s</string>
+    <string name="reservations_share_time">⏰ %1$s – %2$s (%3$d min)</string>
+    <string name="reservations_share_court">📍 %1$s</string>
+    <string name="reservations_share_court_sponsor">📍 %1$s · %2$s</string>
     <string name="reservations_cancel_title">¿Anular la reserva?</string>
     <!-- "Lunes, 26 de octubre · 17:30 – 19:00" -->
     <string name="reservations_cancel_text">%1$s · %2$s</string>
