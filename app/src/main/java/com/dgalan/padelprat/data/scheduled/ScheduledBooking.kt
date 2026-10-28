@@ -17,7 +17,10 @@ data class ScheduledBooking(
     @Serializable(with = LocalDateSerializer::class) val date: LocalDate,
     @Serializable(with = LocalTimeSerializer::class) val start: LocalTime,
     val durationMinutes: Int,
-    /** Hasta 3 pistas, por orden de preferencia: se prueba la primera y, si no está libre, la siguiente. */
+    /**
+     * Hasta 3 pistas, por orden de preferencia: se prueba la primera y, si no está libre, la siguiente. Si no sale
+     * ninguna, se prueba cualquier otra libre a esa hora.
+     */
     val courts: List<ScheduledCourt>,
     /**
      * Se ha empezado a reservar (justo antes de la primera pre-reserva). Si el servicio muere a partir de aquí, no se

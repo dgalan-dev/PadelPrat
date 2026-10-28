@@ -379,7 +379,8 @@ private fun ScheduledCard(booking: ScheduledBooking, onCancelClick: () -> Unit, 
             color = scheme.onSurface
         )
         Text(
-            text = booking.courts.joinToString(" → ") { it.name },
+            text = (booking.courts.map { it.name } + stringResource(R.string.reservations_scheduled_any_court))
+                .joinToString(" → "),
             style = MaterialTheme.typography.bodyMedium,
             color = scheme.onSurfaceVariant
         )

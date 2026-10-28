@@ -9,7 +9,9 @@ import android.content.Intent
 import androidx.core.app.NotificationCompat
 import com.dgalan.padelprat.MainActivity
 import com.dgalan.padelprat.R
+import com.dgalan.padelprat.core.network.Syltek
 import dagger.hilt.android.qualifiers.ApplicationContext
+import java.time.Instant
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import javax.inject.Inject
@@ -65,7 +67,7 @@ class ScheduledBookingNotifications @Inject constructor(@ApplicationContext priv
                     context.getString(R.string.notification_result_booked_text, result.court.name, day, time)
             }
 
-            ScheduledRunResult.NoCourtFree -> failed(R.string.notification_result_no_court, day, time)
+            is ScheduledRunResult.NoCourtFree -> failed(R.string.notification_result_no_court, day, time)
 
             ScheduledRunResult.LimitReached -> failed(R.string.notification_result_limit, day, time)
 
@@ -80,19 +82,51 @@ class ScheduledBookingNotifications @Inject constructor(@ApplicationContext priv
 
             ScheduledRunResult.Missed -> failed(R.string.notification_result_missed, day, time)
         }
+        val details = when (val result = run.result) {
+            is ScheduledRunResult.Booked ->
+                if (result.chosen) null else context.getString(R.string.notification_result_booked_other)
+
+            is ScheduledRunResult.NoCourtFree -> noCourtDetails(result)
+
+            else -> null
+        }
         val clockWarning = run.clockOffset?.let {
-            "\n" + context.getString(R.string.notification_clock_warning, abs(it.seconds))
-        }.orEmpty()
+            context.getString(R.string.notification_clock_warning, abs(it.seconds))
+        }
+        val bigText = listOfNotNull(text, details, clockWarning).joinToString("\n\n")
         val notification = NotificationCompat.Builder(context, CHANNEL_RESULT)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title)
             .setContentText(text)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(text + clockWarning))
+            .setStyle(NotificationCompat.BigTextStyle().bigText(bigText))
             .setAutoCancel(true)
             .setContentIntent(openApp())
             .build()
         manager.notify(booking.id.hashCode(), notification)
     }
+
+    /** Qué pasó con cada pista elegida, una por línea, y con las demás. */
+    private fun noCourtDetails(result: ScheduledRunResult.NoCourtFree): String {
+        val read = context.getString(R.string.notification_timetable_read, result.timetableReadAt.clubTime())
+        val courts = result.attempts.map { attempt ->
+            val name = attempt.court.name
+            val at = attempt.at?.clubTime().orEmpty()
+            when (val outcome = attempt.outcome) {
+                CourtOutcome.BusyAtOpening -> context.getString(R.string.notification_court_busy, name)
+
+                CourtOutcome.Taken -> context.getString(R.string.notification_court_taken, name, at)
+
+                is CourtOutcome.Rejected ->
+                    context.getString(R.string.notification_court_rejected, name, at, outcome.message)
+            }
+        }
+        val others = context.getString(
+            if (result.othersFree) R.string.notification_others_lost else R.string.notification_others_none
+        )
+        return (listOf(read) + courts + others).joinToString("\n")
+    }
+
+    private fun Instant.clubTime(): String = atZone(Syltek.ZONE).format(CLUB_TIME)
 
     private fun failed(reason: Int, day: String, time: String): Pair<String, String> =
         context.getString(R.string.notification_result_failed_title) to context.getString(reason, day, time)
@@ -112,6 +146,9 @@ class ScheduledBookingNotifications @Inject constructor(@ApplicationContext priv
         private const val CHANNEL_RESULT = "scheduled_result"
         private val SPANISH = Locale.forLanguageTag("es-ES")
         private val TIME: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
+
+        /** Hora del club con décimas: "9:00:00,4". */
+        private val CLUB_TIME: DateTimeFormatter = DateTimeFormatter.ofPattern("H:mm:ss,S")
         private val LONG_DATE: DateTimeFormatter = DateTimeFormatter.ofPattern("EEEE d 'de' MMMM", SPANISH)
     }
 }
