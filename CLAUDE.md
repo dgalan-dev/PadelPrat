@@ -34,7 +34,7 @@ Se publican en GitHub Releases (no en Google Play). Para sacar una versión: sub
   - `feature/<nombre>/`: pantallas y ViewModels de cada funcionalidad.
   - `data/<área>/`: repositorios y fuentes de datos remotas (`XxxRemoteDataSource`), con resultados como `sealed interface` (p. ej. `LoginResult`).
   - `core/network/`: cliente HTTP y sesión. `ui/theme/`: tema.
-  - `ui/components/`: componentes reutilizables entre pantallas (`PillSwitch`, el selector de píldora de los mocks; `PadelCard`, `Tag`, `CourtName`, `ShimmerBox`, `MessageState`). Antes de crear uno nuevo, mirar si ya existe aquí.
+  - `ui/components/`: componentes reutilizables entre pantallas (`PillSwitch`, el selector de píldora de los mocks; `PadelCard`, `Tag`, `CourtName`, `ShimmerBox`, `MessageState`, `SwipeableSnackbarHost`, que es el que se usa para todas las snackbars). Antes de crear uno nuevo, mirar si ya existe aquí.
   - `ui/format/`: formato de fechas y horas de la interfaz (`hourText`, `longDate`, `openingText`, `shortName`).
 - **Backend**: no hay API propia; es la web de reservas del club (Syltek, `https://prat.syltek.com/`), replicada por ingeniería inversa. **Antes de tocar cualquier petición, leer `docs/syltek-api.md`**: rutas, formularios, selectores HTML y reglas (p. ej. la pre-reserva bloquea la pista 8 minutos, anular es un GET que no se puede reintentar).
   - Respuestas en HTML y formularios `x-www-form-urlencoded`: OkHttp directo, sin Retrofit. El HTML se lee con Jsoup, en parsers aislados (`TimetableParser`, `ReservationParsers`).

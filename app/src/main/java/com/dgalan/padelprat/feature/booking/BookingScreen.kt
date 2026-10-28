@@ -43,7 +43,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
@@ -110,6 +109,7 @@ import com.dgalan.padelprat.ui.components.MessageState
 import com.dgalan.padelprat.ui.components.PadelCard
 import com.dgalan.padelprat.ui.components.PillSwitch
 import com.dgalan.padelprat.ui.components.ShimmerBox
+import com.dgalan.padelprat.ui.components.SwipeableSnackbarHost
 import com.dgalan.padelprat.ui.components.Tag
 import com.dgalan.padelprat.ui.format.hourText
 import com.dgalan.padelprat.ui.format.openingText
@@ -158,7 +158,7 @@ fun BookingScreen(
             onRetry = viewModel::onRetry,
             onReservationsClick = onReservationsClick
         )
-        SnackbarHost(
+        SwipeableSnackbarHost(
             hostState = snackbarHostState,
             modifier = Modifier
                 .align(Alignment.BottomCenter)

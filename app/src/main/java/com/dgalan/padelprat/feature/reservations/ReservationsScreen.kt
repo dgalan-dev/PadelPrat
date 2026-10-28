@@ -25,7 +25,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -65,6 +64,7 @@ import com.dgalan.padelprat.ui.components.MessageState
 import com.dgalan.padelprat.ui.components.PadelCard
 import com.dgalan.padelprat.ui.components.PillSwitch
 import com.dgalan.padelprat.ui.components.ShimmerBox
+import com.dgalan.padelprat.ui.components.SwipeableSnackbarHost
 import com.dgalan.padelprat.ui.components.Tag
 import com.dgalan.padelprat.ui.format.SPANISH
 import com.dgalan.padelprat.ui.format.hourText
@@ -185,7 +185,7 @@ private fun ReservationsContent(
                 }
             }
         }
-        SnackbarHost(
+        SwipeableSnackbarHost(
             hostState = snackbarHostState,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
