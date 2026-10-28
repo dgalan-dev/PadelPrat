@@ -49,7 +49,7 @@ fun <T> PillSwitch(
     val scheme = MaterialTheme.colorScheme
     BoxWithConstraints(
         modifier = modifier
-            .height(40.dp)
+            .height(48.dp)
             .background(scheme.surfaceVariant, CircleShape)
             .padding(3.dp)
     ) {

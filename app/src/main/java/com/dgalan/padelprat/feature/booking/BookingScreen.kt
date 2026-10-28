@@ -41,6 +41,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHostState
@@ -283,8 +284,16 @@ private fun BookingContent(
                     }
                 }
                 when (val content = uiState.content) {
-                    BookingContent.Loading -> items(SKELETON_CARDS, key = { "skeleton$it" }) {
-                        SkeletonCourtCard(Modifier.padding(horizontal = 16.dp, vertical = 5.dp))
+                    BookingContent.Loading -> if (
+                        uiState.view == BookingView.Times && !uiState.isLocked(uiState.selectedDay)
+                    ) {
+                        item(key = "skeleton-times") {
+                            SkeletonTimeList(Modifier.padding(horizontal = 16.dp, vertical = 5.dp))
+                        }
+                    } else {
+                        items(SKELETON_CARDS, key = { "skeleton$it" }) {
+                            SkeletonCourtCard(Modifier.padding(horizontal = 16.dp, vertical = 5.dp))
+                        }
                     }
 
                     is BookingContent.Error -> item(key = "error") { ErrorState(content.error, onRetry) }
@@ -424,7 +433,10 @@ private fun LazyListScope.courtItems(
     }
 }
 
-/** Vista por hora: una tarjeta por hora de inicio con las pistas libres a esa hora. */
+/**
+ * Vista por hora: una sola tarjeta con una fila por hora de inicio, para ver la franja entera de un vistazo. Va en un
+ * único elemento de la lista porque son pocas filas (una franja tiene como mucho unas 20 horas).
+ */
 private fun LazyListScope.timeItems(
     times: List<TimeSlots>,
     selectedSlot: SelectedSlot?,
@@ -432,18 +444,28 @@ private fun LazyListScope.timeItems(
     onSlotClick: (courtId: Int, start: Instant) -> Unit,
     onMineClick: () -> Unit
 ) {
-    itemsIndexed(times, key = { _, timeSlots -> "time-${timeSlots.start.epochSecond}" }) { index, timeSlots ->
+    if (times.isEmpty()) return
+    item(key = "times") {
         EntranceAnimation(
-            delayMillis = index * 50,
+            delayMillis = 0,
             animate = entranceOpen,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 5.dp)
         ) {
-            TimeCard(
-                timeSlots = timeSlots,
-                selectedSlot = selectedSlot,
-                onSlotClick = onSlotClick,
-                onMineClick = onMineClick
-            )
+            PadelCard {
+                Column {
+                    times.forEachIndexed { index, timeSlots ->
+                        key(timeSlots.start) {
+                            if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                            TimeRow(
+                                timeSlots = timeSlots,
+                                selectedSlot = selectedSlot,
+                                onSlotClick = onSlotClick,
+                                onMineClick = onMineClick
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -773,6 +795,9 @@ private fun CourtIcon(court: Court, tint: Color, size: Dp) {
 
 private const val SLOT_COLUMNS = 3
 
+/** Alto de los chips de la parrilla: la zona táctil mínima de Material. */
+private val CHIP_HEIGHT = 48.dp
+
 /** Margen tras desplegar o plegar en el que las horas se animan; cubre el inicio de sus animaciones. */
 private const val SLOT_ANIMATION_WINDOW_MILLIS = 600L
 
@@ -806,7 +831,7 @@ private fun GridChip(
     val (background, contentColor) = slotColors(state, selected)
     Box(
         modifier = modifier
-            .height(40.dp)
+            .height(CHIP_HEIGHT)
             .background(background, MaterialTheme.shapes.small)
             .then(if (state == SlotState.Free) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier)
             .semantics {
@@ -839,47 +864,82 @@ private fun SlotChip(slot: Slot, selected: Boolean, onClick: () -> Unit, modifie
     }
 }
 
-/** Tarjeta de la vista por hora: la hora, las reservas propias que empiezan entonces y las pistas libres a esa hora. */
+/** Fila de la vista por hora: la hora con las pistas libres a la izquierda, y sus chips y las reservas propias. */
 @Composable
-private fun TimeCard(
+private fun TimeRow(
     timeSlots: TimeSlots,
     selectedSlot: SelectedSlot?,
     onSlotClick: (courtId: Int, start: Instant) -> Unit,
     onMineClick: () -> Unit
 ) {
     val free = timeSlots.courts.count { it.state == SlotState.Free }
-    PadelCard {
-        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+    TimeRowLayout(
+        time = {
+            Text(
+                text = timeSlots.time.hourText(),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            if (free > 0) {
                 Text(
-                    text = timeSlots.time.hourText(),
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.weight(1f)
+                    text = pluralStringResource(R.plurals.booking_free_courts, free, free),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                if (free > 0) FreeTag(pluralStringResource(R.plurals.booking_free_courts, free, free))
             }
-            timeSlots.mine.forEach { booking ->
-                MineChip(booking, showCourt = true, onClick = onMineClick, modifier = Modifier.fillMaxWidth())
+        }
+    ) { chipWidth ->
+        timeSlots.mine.forEach { booking ->
+            MineChip(booking, showCourt = true, onClick = onMineClick, modifier = Modifier.fillMaxWidth())
+        }
+        timeSlots.courts.forEach { courtAtTime ->
+            CourtChip(
+                courtAtTime = courtAtTime,
+                selected = selectedSlot == SelectedSlot(courtAtTime.court.id, timeSlots.start),
+                onClick = { onSlotClick(courtAtTime.court.id, timeSlots.start) },
+                modifier = Modifier.width(chipWidth)
+            )
+        }
+    }
+}
+
+/**
+ * Estructura de una fila de la vista por hora, compartida con su silueta para que al cargar no salte nada: la columna
+ * de la hora a la izquierda y los chips en una cuadrícula. [chips] recibe el ancho de cada chip.
+ */
+@Composable
+private fun TimeRowLayout(time: @Composable () -> Unit, chips: @Composable (chipWidth: Dp) -> Unit) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
+    ) {
+        Column(modifier = Modifier.width(56.dp).padding(top = 2.dp)) {
+            time()
+        }
+        BoxWithConstraints(modifier = Modifier.weight(1f)) {
+            val gap = 6.dp
+            // Tantas columnas como quepan, todas del mismo ancho y en píxeles enteros, para que los chips queden
+            // alineados de una hora a otra y ninguno salte de fila por un píxel
+            val chipWidth = with(LocalDensity.current) {
+                val gapPx = gap.roundToPx()
+                val columns = ((constraints.maxWidth + gapPx) / (COURT_CHIP_MIN_WIDTH.roundToPx() + gapPx))
+                    .coerceAtLeast(1)
+                ((constraints.maxWidth - gapPx * (columns - 1)) / columns).toDp()
             }
-            timeSlots.courts.chunked(SLOT_COLUMNS).forEach { row ->
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    row.forEach { courtAtTime ->
-                        CourtChip(
-                            courtAtTime = courtAtTime,
-                            selected = selectedSlot == SelectedSlot(courtAtTime.court.id, timeSlots.start),
-                            onClick = { onSlotClick(courtAtTime.court.id, timeSlots.start) },
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                    repeat(SLOT_COLUMNS - row.size) { Spacer(Modifier.weight(1f)) }
-                }
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(gap),
+                verticalArrangement = Arrangement.spacedBy(gap)
+            ) {
+                chips(chipWidth)
             }
         }
     }
 }
 
-/** Pista de la vista por hora: su icono (cubierta o no) y su nombre. El patrocinador está en la hoja. */
+/** Ancho mínimo de los chips de la vista por hora: los 48 dp de zona táctil que pide Material (5 por fila en un móvil). */
+private val COURT_CHIP_MIN_WIDTH = 48.dp
+
+/** Pista libre en la vista por hora: solo su número ("3") y el icono de cubierta; TalkBack lee "Pista 3, libre". */
 @Composable
 private fun CourtChip(courtAtTime: CourtAtTime, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val court = courtAtTime.court
@@ -890,11 +950,11 @@ private fun CourtChip(courtAtTime: CourtAtTime, selected: Boolean, onClick: () -
         onClick = onClick,
         modifier = modifier
     ) { color ->
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 8.dp)) {
-            CourtIcon(court, tint = color, size = 16.dp)
-            Spacer(Modifier.width(4.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            CourtIcon(court, tint = color, size = 14.dp)
+            Spacer(Modifier.width(2.dp))
             Text(
-                text = court.name,
+                text = court.number(),
                 style = MaterialTheme.typography.labelLarge,
                 color = color,
                 maxLines = 1,
@@ -904,10 +964,9 @@ private fun CourtChip(courtAtTime: CourtAtTime, selected: Boolean, onClick: () -
     }
 }
 
-/**
- * Una reserva propia entera, de la hora de inicio a la de fin. Va con borde y sin relleno para que se lea como un
- * dato y no como un hueco que reservar; al tocarla se abre Mis reservas.
- */
+/** "3" de "Pista 3"; si el nombre no lleva número, el nombre entero. */
+private fun Court.number(): String = Regex("""\d+""").find(name)?.value ?: name
+
 @Composable
 private fun MineChip(booking: MyBooking, showCourt: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val scheme = MaterialTheme.colorScheme
@@ -922,7 +981,7 @@ private fun MineChip(booking: MyBooking, showCourt: Boolean, onClick: () -> Unit
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
         modifier = modifier
-            .height(40.dp)
+            .height(CHIP_HEIGHT)
             .clip(MaterialTheme.shapes.small)
             .border(1.dp, scheme.primary, MaterialTheme.shapes.small)
             .clickable(
@@ -949,6 +1008,32 @@ private fun MineChip(booking: MyBooking, showCourt: Boolean, onClick: () -> Unit
     }
 }
 
+/** Silueta de la vista por hora mientras carga: la tarjeta con unas filas de distinto número de pistas. */
+@Composable
+private fun SkeletonTimeList(modifier: Modifier = Modifier) {
+    PadelCard(modifier = modifier) {
+        Column {
+            SKELETON_TIME_CHIPS.forEachIndexed { index, chipCount ->
+                if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                TimeRowLayout(
+                    time = {
+                        ShimmerBox(Modifier.width(44.dp).height(18.dp), cornerRadius = 9.dp)
+                        Spacer(Modifier.height(6.dp))
+                        ShimmerBox(Modifier.width(36.dp).height(12.dp), cornerRadius = 6.dp)
+                    }
+                ) { chipWidth ->
+                    repeat(chipCount) {
+                        ShimmerBox(Modifier.width(chipWidth).height(CHIP_HEIGHT), cornerRadius = 12.dp)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Pistas de cada fila de la silueta de la vista por hora. */
+private val SKELETON_TIME_CHIPS = listOf(4, 2, 6, 3, 5)
+
 /** Silueta de una tarjeta de pista mientras carga. */
 @Composable
 private fun SkeletonCourtCard(modifier: Modifier = Modifier) {
@@ -960,7 +1045,7 @@ private fun SkeletonCourtCard(modifier: Modifier = Modifier) {
         }
         repeat(2) {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                repeat(SLOT_COLUMNS) { ShimmerBox(Modifier.weight(1f).height(40.dp), cornerRadius = 12.dp) }
+                repeat(SLOT_COLUMNS) { ShimmerBox(Modifier.weight(1f).height(CHIP_HEIGHT), cornerRadius = 12.dp) }
             }
         }
     }

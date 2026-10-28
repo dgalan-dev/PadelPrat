@@ -115,6 +115,12 @@ private fun ProfileContent(
                 .fillMaxWidth()
                 .height(48.dp)
         ) {
+            Icon(
+                painter = painterResource(R.drawable.ic_logout),
+                contentDescription = null,
+                modifier = Modifier.size(ButtonDefaults.IconSize)
+            )
+            Spacer(Modifier.width(ButtonDefaults.IconSpacing))
             Text(stringResource(R.string.profile_logout), style = MaterialTheme.typography.labelLarge)
         }
         Spacer(Modifier.height(16.dp))

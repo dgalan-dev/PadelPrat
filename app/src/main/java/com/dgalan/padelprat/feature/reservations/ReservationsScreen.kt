@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -293,7 +294,11 @@ private fun UpcomingCard(reservation: Reservation, highlighted: Boolean, onCance
                 Text(stringResource(R.string.reservations_share))
             }
             if (reservation.canCancel) {
-                OutlinedButton(onClick = { onCancelClick(reservation) }) {
+                // Anular borra la reserva: en rojo, como "Cerrar sesión", para que no se pulse por costumbre
+                OutlinedButton(
+                    onClick = { onCancelClick(reservation) },
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) {
                     Text(stringResource(R.string.reservations_cancel))
                 }
             }

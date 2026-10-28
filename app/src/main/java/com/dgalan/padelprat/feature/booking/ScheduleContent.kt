@@ -190,7 +190,7 @@ private fun TimeChip(time: LocalTime, selected: Boolean, onClick: () -> Unit, mo
     val scheme = MaterialTheme.colorScheme
     Box(
         modifier = modifier
-            .height(40.dp)
+            .height(48.dp)
             .background(if (selected) scheme.primary else scheme.surfaceVariant, MaterialTheme.shapes.small)
             .clickable(role = Role.Button, onClick = onClick)
             .semantics { this.selected = selected },
