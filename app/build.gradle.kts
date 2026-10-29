@@ -40,8 +40,8 @@ android {
         applicationId = "com.dgalan.padelprat"
         minSdk = 26
         targetSdk = 37
-        versionCode = 7
-        versionName = "1.2.3"
+        versionCode = 8
+        versionName = "1.3.0"
 
         // Web de reservas del club (Syltek). Ver docs/syltek-api.md
         buildConfigField("String", "BASE_URL", "\"https://prat.syltek.com/\"")
