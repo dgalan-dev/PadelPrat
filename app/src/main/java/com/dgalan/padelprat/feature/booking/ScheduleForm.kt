@@ -20,11 +20,23 @@ data class ScheduleForm(
     /** Inicios posibles en la franja elegida donde cabe la duración elegida antes del cierre. */
     val times: List<LocalTime>,
     val selectedTime: LocalTime? = null,
+    /** Hora alternativa opcional, por si a [selectedTime] no hay ninguna pista. */
+    val alternativeTime: LocalTime? = null,
     /** Ids de las pistas elegidas, por orden de preferencia (como mucho [MAX_SCHEDULED_COURTS]). */
     val selectedCourts: List<Int> = emptyList(),
     val isSaving: Boolean = false
 ) {
     val canSave: Boolean get() = selectedTime != null && selectedCourts.isNotEmpty() && !isSaving
+
+    /**
+     * La primera hora que se toca es la principal; la segunda, la alternativa (otra la sustituye). Al quitar la
+     * principal, la alternativa pasa a serlo.
+     */
+    fun toggleTime(time: LocalTime): ScheduleForm = when (time) {
+        selectedTime -> copy(selectedTime = alternativeTime, alternativeTime = null)
+        alternativeTime -> copy(alternativeTime = null)
+        else -> if (selectedTime == null) copy(selectedTime = time) else copy(alternativeTime = time)
+    }
 
     companion object {
         fun from(
@@ -48,6 +60,7 @@ data class ScheduleForm(
                 times = times,
                 // Al cambiar de franja o de duración se conserva lo elegido si sigue siendo posible
                 selectedTime = previous?.selectedTime?.takeIf { keepPrevious && it in times },
+                alternativeTime = previous?.alternativeTime?.takeIf { keepPrevious && it in times },
                 selectedCourts = if (keepPrevious) previous.selectedCourts else emptyList()
             )
         }

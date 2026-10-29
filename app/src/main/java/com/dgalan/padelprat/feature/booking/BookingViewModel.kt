@@ -221,7 +221,7 @@ class BookingViewModel @Inject constructor(
     }
 
     fun onScheduleTimeSelect(time: LocalTime) {
-        updateScheduleForm { it.copy(selectedTime = if (it.selectedTime == time) null else time) }
+        updateScheduleForm { it.toggleTime(time) }
     }
 
     /** Añade la pista al final de la lista de preferencia o la quita si ya estaba. */
@@ -254,10 +254,13 @@ class BookingViewModel @Inject constructor(
                 date = form.day,
                 start = time,
                 durationMinutes = _uiState.value.durationMinutes,
-                courts = courts
+                courts = courts,
+                alternativeStart = form.alternativeTime
             )
             scheduledRepository.add(booking)
-            updateScheduleForm { it.copy(isSaving = false, selectedTime = null, selectedCourts = emptyList()) }
+            updateScheduleForm {
+                it.copy(isSaving = false, selectedTime = null, alternativeTime = null, selectedCourts = emptyList())
+            }
             _uiState.update { it.copy(message = BookingMessage.Scheduled(booking.opensAt)) }
         }
     }

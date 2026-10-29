@@ -53,6 +53,12 @@
     <!-- "Este día todavía no se puede reservar. Se abre el sábado 24 a las 9:00." -->
     <string name="schedule_opens_info">Este día todavía no se puede reservar. Se abre el %1$s. Prográmalo y la app intentará reservarlo en ese momento.</string>
     <string name="schedule_time_title">Hora</string>
+    <!-- Bajo las horas, con una elegida: "Toca otra hora si quieres una alternativa por si a las 19:00 no hay pista." -->
+    <string name="schedule_alternative_hint">Toca otra hora si quieres una alternativa por si a las %1$s no hay pista.</string>
+    <!-- "Si a las 19:00 no hay pista, se intentará a las 19:30." -->
+    <string name="schedule_alternative_set">Si a las %1$s no hay pista, se intentará a las %2$s.</string>
+    <!-- Descripción para lectores de pantalla de la hora alternativa: "19:30, hora alternativa" -->
+    <string name="schedule_time_alternative">%1$s, hora alternativa</string>
     <string name="schedule_no_times">No hay horas en esta franja con esta duración.</string>
     <plurals name="schedule_courts_title">
         <item quantity="one">Pista (%d)</item>
@@ -88,6 +94,10 @@
     <string name="notification_result_test_text">Se habría reservado la %1$s a las %2$s. No se ha hecho ninguna reserva.</string>
     <string name="notification_result_failed_title">No se ha podido reservar</string>
     <string name="notification_result_no_court">Ninguna pista libre el %1$s a las %2$s.</string>
+    <!-- Con hora alternativa: "Ninguna pista libre el jueves 5 de noviembre a las 19:00 ni a las 19:30." -->
+    <string name="notification_result_no_court_alternative">Ninguna pista libre el %1$s a las %2$s ni a las %3$s.</string>
+    <!-- Título de lo que pasó a cada hora, cuando hay hora alternativa: "A las 19:30:" -->
+    <string name="notification_time_header">A las %1$s:</string>
     <!-- "Parrilla leída a las 9:00:00,4 (hora del club)." -->
     <string name="notification_timetable_read">Parrilla leída a las %1$s (hora del club).</string>
     <!-- Qué pasó con cada pista elegida: "Pista 2: ya estaba ocupada al abrir." -->
@@ -108,6 +118,8 @@
     <string name="notification_others_none">Tampoco había otra pista libre a esa hora.</string>
     <string name="notification_others_free">Otras pistas que salieron libres:</string>
     <string name="notification_result_booked_other">Ninguna de las pistas elegidas estaba libre.</string>
+    <!-- Reservada a la hora alternativa: "No había ninguna pista a las 19:00." -->
+    <string name="notification_result_booked_alternative">No había ninguna pista a las %1$s.</string>
     <string name="notification_result_limit">Ya tenías el máximo de reservas del club para el %1$s a las %2$s. Anula una para poder reservar.</string>
     <string name="notification_result_logged_out">La sesión se había cerrado; no se ha podido reservar el %1$s a las %2$s. Vuelve a entrar en la app.</string>
     <string name="notification_result_not_opened">El club no abrió el %1$s a la hora prevista; no se ha reservado a las %2$s.</string>
@@ -163,6 +175,8 @@
     <string name="reservations_scheduled_when">Se intentará reservar el %1$s</string>
     <!-- Al final de "Pista 2 → Pista 5 → Pista 1 → cualquier otra" -->
     <string name="reservations_scheduled_any_court">cualquier otra</string>
+    <!-- Hora alternativa de una reserva programada: "Si no hay pista, de 19:30 a 21:00" -->
+    <string name="reservations_scheduled_alternative">Si no hay pista, de %1$s a %2$s</string>
     <string name="reservations_scheduled_cancel">Cancelar programación</string>
     <string name="reservations_scheduled_cancelled">Programación cancelada</string>
     <string name="reservations_scheduled_test">Probar ahora</string>

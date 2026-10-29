@@ -13,6 +13,7 @@ import com.dgalan.padelprat.data.reservations.ReservationsRepository
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalTime
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.abs
@@ -22,22 +23,22 @@ import kotlinx.coroutines.flow.first
 /** Resultado de intentar una reserva programada, para la notificación. */
 sealed interface ScheduledRunResult {
     /**
-     * Reservada (o, en modo de prueba, la pista que se habría reservado). [chosen] es `false` si no era una de las
-     * elegidas: ninguna de ellas estaba libre y se ha cogido otra.
+     * Reservada a [start] (o, en modo de prueba, la pista que se habría reservado). [chosen] es `false` si no era una
+     * de las elegidas: ninguna de ellas estaba libre y se ha cogido otra. [start] es la hora alternativa si a la
+     * principal no había ninguna pista.
      */
-    data class Booked(val court: ScheduledCourt, val dryRun: Boolean, val chosen: Boolean = true) :
-        ScheduledRunResult
+    data class Booked(
+        val court: ScheduledCourt,
+        val start: LocalTime,
+        val dryRun: Boolean,
+        val chosen: Boolean = true
+    ) : ScheduledRunResult
 
     /**
-     * No se ha podido reservar ninguna pista a esa hora. [chosen] dice qué pasó con cada una de las elegidas, por
-     * orden, y [others] con las demás que llegaron a salir libres. [timetableReadAt] es cuándo se leyó la parrilla
-     * tras la apertura, en el reloj del club.
+     * No se ha podido reservar ninguna pista a ninguna de las horas: [times] dice qué pasó en cada una, por orden.
+     * [timetableReadAt] es cuándo se leyó la parrilla tras la apertura, en el reloj del club.
      */
-    data class NoCourtFree(
-        val chosen: List<CourtAttempt>,
-        val others: List<CourtAttempt>,
-        val timetableReadAt: Instant
-    ) : ScheduledRunResult
+    data class NoCourtFree(val times: List<TimeAttempts>, val timetableReadAt: Instant) : ScheduledRunResult
 
     /** Ya había el máximo de reservas activas del club. */
     data object LimitReached : ScheduledRunResult
@@ -57,6 +58,12 @@ sealed interface ScheduledRunResult {
     /** Sin conexión o la web respondió algo inesperado. */
     data object Failed : ScheduledRunResult
 }
+
+/**
+ * Qué pasó a una de las horas: [chosen], con cada una de las pistas elegidas, por orden, y [others], con las demás que
+ * llegaron a salir libres.
+ */
+data class TimeAttempts(val start: LocalTime, val chosen: List<CourtAttempt>, val others: List<CourtAttempt>)
 
 /**
  * Qué pasó con una pista que no se ha podido reservar. [tries] es cuántas pre-reservas se lanzaron; [firstAt] y [at],
@@ -99,7 +106,8 @@ data class ScheduledRun(val result: ScheduledRunResult, val clockOffset: Duratio
  *    (`nowUtcMaxAvailability`) llega a la hora pedida (como mucho [OPEN_TIMEOUT]): cada [FAST_POLL_INTERVAL] hasta
  *    [FAST_POLL_WINDOW] después de la apertura y luego cada [POLL_INTERVAL];
  * 5. reserva la primera pista libre a esa hora, por orden de preferencia, con el flujo normal de la app; si ninguna de
- *    las elegidas lo está, cualquier otra, en el orden de la parrilla;
+ *    las elegidas lo está, cualquier otra, en el orden de la parrilla; y si no hay ninguna, lo mismo a la hora
+ *    alternativa, si la hay;
  * 6. si la web rechaza las pre-reservas sin motivo (p. ej. porque aún no deja reservar, aunque la parrilla ya salga),
  *    vuelve a leer la parrilla y lo intenta otra vez con las que sigan libres, durante [RETRY_WINDOW]: cada
  *    [FAST_POLL_INTERVAL] los primeros [FAST_POLL_WINDOW] y luego cada [POLL_INTERVAL].
@@ -139,10 +147,10 @@ class ScheduledBookingRunner @Inject constructor(
             if (!wait.isNegative) delay(wait.toMillis())
         }
 
-        val start = booking.date.atTime(booking.start).atZone(Syltek.ZONE).toInstant()
-        val slotStart = if (dryRun) targetDay.atTime(booking.start).atZone(Syltek.ZONE).toInstant() else start
+        // Inicio de cada hora en el día que se consulta (el de la semana anterior en modo de prueba)
+        val slotStarts = booking.starts.associateWith { targetDay.atTime(it).atZone(Syltek.ZONE).toInstant() }
         val fastUntil = if (dryRun) Instant.MIN else opensAtLocal.plus(FAST_POLL_WINDOW)
-        var timetable = waitUntilOpen(targetDay, slotStart, fastUntil)
+        var timetable = waitUntilOpen(targetDay, slotStarts.values.max(), fastUntil)
             ?: return ScheduledRun(ScheduledRunResult.NotOpened, warning)
         val timetableReadAt = clubNow(offset)
         // Los reintentos cuentan desde que el día sale abierto, también si se lanza tarde
@@ -150,7 +158,8 @@ class ScheduledBookingRunner @Inject constructor(
         val retryUntil = Instant.now().plus(RETRY_WINDOW)
 
         val chosenIds = booking.courts.map { it.id }.toSet()
-        val tracks = LinkedHashMap<Int, CourtTrack>()
+        // Por hora y pista, en el orden en que se intentan: primero la hora y, dentro de ella, la preferencia
+        val tracks = LinkedHashMap<Pair<LocalTime, Int>, CourtTrack>()
         var firstRead = true
         var started = false
 
@@ -162,13 +171,16 @@ class ScheduledBookingRunner @Inject constructor(
                 .filter { it.id !in chosenIds }
                 .map { ScheduledCourt(it.id, it.name, it.sponsor) }
             val free = mutableListOf<CourtTrack>()
-            for (court in booking.courts + others) {
-                val track = tracks.getOrPut(court.id) { CourtTrack(court) }
-                val slot = slots.firstOrNull { it.court.id == court.id }?.slots?.firstOrNull { it.start == slotStart }
-                when {
-                    slot?.state == SlotState.Free -> if (track.final == null) free += track
-                    firstRead -> track.busyAtOpening = true
-                    !track.busyAtOpening -> track.taken = true
+            for ((time, slotStart) in slotStarts) {
+                for (court in booking.courts + others) {
+                    val track = tracks.getOrPut(time to court.id) { CourtTrack(court, time) }
+                    val courtSlots = slots.firstOrNull { it.court.id == court.id }
+                    val slot = courtSlots?.slots?.firstOrNull { it.start == slotStart }
+                    when {
+                        slot?.state == SlotState.Free -> if (track.final == null) free += track
+                        firstRead -> track.busyAtOpening = true
+                        !track.busyAtOpening -> track.taken = true
+                    }
                 }
             }
             firstRead = false
@@ -176,18 +188,27 @@ class ScheduledBookingRunner @Inject constructor(
 
             for (track in free) {
                 val chosen = track.court.id in chosenIds
-                if (dryRun) return ScheduledRun(ScheduledRunResult.Booked(track.court, dryRun = true, chosen), warning)
+                if (dryRun) {
+                    return ScheduledRun(
+                        ScheduledRunResult.Booked(track.court, track.time, dryRun = true, chosen),
+                        warning
+                    )
+                }
                 // A partir de aquí puede quedar hecha una reserva: se apunta por si el servicio muere a medias
                 if (!started) {
                     started = true
                     onBookingStart()
                 }
 
+                val start = booking.date.atTime(track.time).atZone(Syltek.ZONE).toInstant()
                 val result = reservationRepository.book(track.court.id, start, booking.durationMinutes)
                 track.tried(clubNow(offset))
                 when (result) {
                     is ReservationResult.Success ->
-                        return ScheduledRun(ScheduledRunResult.Booked(track.court, dryRun = false, chosen), warning)
+                        return ScheduledRun(
+                            ScheduledRunResult.Booked(track.court, track.time, dryRun = false, chosen),
+                            warning
+                        )
 
                     // Ocupada o aún sin abrir: la siguiente parrilla lo dirá, y si sigue libre se vuelve a intentar
                     ReservationResult.SlotRefused -> Unit
@@ -201,8 +222,8 @@ class ScheduledBookingRunner @Inject constructor(
                     // aparece no se prueba otra pista, porque el listado puede tardar en mostrarla y se reservaría
                     // dos veces
                     ReservationResult.Uncertain -> return ScheduledRun(
-                        if (appearsBooked(booking, track.court)) {
-                            ScheduledRunResult.Booked(track.court, dryRun = false)
+                        if (appearsBooked(booking, track.court, track.time)) {
+                            ScheduledRunResult.Booked(track.court, track.time, dryRun = false, chosen)
                         } else {
                             ScheduledRunResult.Uncertain
                         },
@@ -231,13 +252,18 @@ class ScheduledBookingRunner @Inject constructor(
             }
         }
 
-        val (chosen, others) = tracks.values.map { it.attempt() }.partition { it.court.id in chosenIds }
-        val othersFree = others.filter { it.outcome != CourtOutcome.BusyAtOpening }
-        return ScheduledRun(ScheduledRunResult.NoCourtFree(chosen, othersFree, timetableReadAt), warning)
+        val times = booking.starts.map { time ->
+            val (chosen, others) = tracks.values
+                .filter { it.time == time }
+                .map { it.attempt() }
+                .partition { it.court.id in chosenIds }
+            TimeAttempts(time, chosen, others.filter { it.outcome != CourtOutcome.BusyAtOpening })
+        }
+        return ScheduledRun(ScheduledRunResult.NoCourtFree(times, timetableReadAt), warning)
     }
 
     /** Lo que se sabe de una pista durante el intento, para el aviso. */
-    private class CourtTrack(val court: ScheduledCourt) {
+    private class CourtTrack(val court: ScheduledCourt, val time: LocalTime) {
         var busyAtOpening = false
 
         /** Salía libre y en una parrilla posterior ya no. */
@@ -269,8 +295,8 @@ class ScheduledBookingRunner @Inject constructor(
      * Si una reserva dudosa sale hecha en Mis reservas, a su hora, con su duración y en la pista que se estaba
      * reservando. Solo lee. Lo mira [VERIFY_ATTEMPTS] veces, por si la conexión tarda en volver.
      */
-    private suspend fun appearsBooked(booking: ScheduledBooking, court: ScheduledCourt): Boolean {
-        val start = booking.date.atTime(booking.start)
+    private suspend fun appearsBooked(booking: ScheduledBooking, court: ScheduledCourt, time: LocalTime): Boolean {
+        val start = booking.date.atTime(time)
         repeat(VERIFY_ATTEMPTS) {
             delay(VERIFY_DELAY.toMillis())
             val booked = reservationsRepository.bookedCourt(start, booking.durationMinutes)

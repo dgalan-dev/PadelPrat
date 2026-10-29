@@ -74,12 +74,22 @@ fun LazyListScope.scheduleItems(
                         TimeChip(
                             time = time,
                             selected = time == form.selectedTime,
+                            alternative = time == form.alternativeTime,
                             onClick = { onTimeSelect(time) },
                             modifier = Modifier.weight(1f)
                         )
                     }
                     repeat(TIME_COLUMNS - row.size) { Spacer(Modifier.weight(1f)) }
                 }
+            }
+            form.selectedTime?.let { selected ->
+                Text(
+                    text = form.alternativeTime?.let {
+                        stringResource(R.string.schedule_alternative_set, selected.hourText(), it.hourText())
+                    } ?: stringResource(R.string.schedule_alternative_hint, selected.hourText()),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }
@@ -185,21 +195,42 @@ private fun Section(title: String, content: @Composable () -> Unit) {
     }
 }
 
+/** Hora elegible: la principal va rellena y la alternativa, con borde. */
 @Composable
-private fun TimeChip(time: LocalTime, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun TimeChip(
+    time: LocalTime,
+    selected: Boolean,
+    alternative: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
     val scheme = MaterialTheme.colorScheme
+    val shape = MaterialTheme.shapes.small
+    val description = if (alternative) {
+        stringResource(R.string.schedule_time_alternative, time.hourText())
+    } else {
+        time.hourText()
+    }
     Box(
         modifier = modifier
             .height(48.dp)
-            .background(if (selected) scheme.primary else scheme.surfaceVariant, MaterialTheme.shapes.small)
+            .background(if (selected) scheme.primary else scheme.surfaceVariant, shape)
+            .then(if (alternative) Modifier.border(2.dp, scheme.primary, shape) else Modifier)
             .clickable(role = Role.Button, onClick = onClick)
-            .semantics { this.selected = selected },
+            .semantics {
+                this.selected = selected || alternative
+                contentDescription = description
+            },
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = time.hourText(),
             style = MaterialTheme.typography.labelLarge,
-            color = if (selected) scheme.onPrimary else scheme.onSurfaceVariant
+            color = when {
+                selected -> scheme.onPrimary
+                alternative -> scheme.primary
+                else -> scheme.onSurfaceVariant
+            }
         )
     }
 }

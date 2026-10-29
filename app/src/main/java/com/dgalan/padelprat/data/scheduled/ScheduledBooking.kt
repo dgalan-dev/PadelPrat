@@ -23,6 +23,11 @@ data class ScheduledBooking(
      */
     val courts: List<ScheduledCourt>,
     /**
+     * Otra hora, opcional, por si a [start] no se puede reservar ninguna pista (ni las elegidas ni otras): se prueba
+     * después, con las mismas pistas y la misma duración.
+     */
+    @Serializable(with = LocalTimeSerializer::class) val alternativeStart: LocalTime? = null,
+    /**
      * Se ha empezado a reservar (justo antes de la primera pre-reserva). Si el servicio muere a partir de aquí, no se
      * vuelve a intentar sola: la reserva podría estar ya hecha y se duplicaría.
      */
@@ -30,13 +35,16 @@ data class ScheduledBooking(
 ) {
     val end: LocalTime get() = start.plusMinutes(durationMinutes.toLong())
 
+    /** Las horas que se intentan, por orden: [start] y, si la hay, [alternativeStart]. */
+    val starts: List<LocalTime> get() = listOfNotNull(start, alternativeStart)
+
     /** Cuándo abre la web este día: a las 9:00 de Madrid, siete días antes. */
     val opensAt: Instant
         get() = date.minusDays(Syltek.BOOKING_OPENS_DAYS_BEFORE).atTime(Syltek.BOOKING_OPENS_AT)
             .atZone(Syltek.ZONE).toInstant()
 
-    /** Inicio del partido, en el reloj real. */
-    val startsAt: Instant get() = date.atTime(start).atZone(Syltek.ZONE).toInstant()
+    /** Inicio del partido a la última hora que se intenta, en el reloj real: a partir de aquí ya no se puede. */
+    val lastStartsAt: Instant get() = date.atTime(starts.max()).atZone(Syltek.ZONE).toInstant()
 }
 
 @Serializable

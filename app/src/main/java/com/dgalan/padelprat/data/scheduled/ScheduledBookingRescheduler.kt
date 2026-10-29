@@ -29,7 +29,7 @@ class ScheduledBookingRescheduler @Inject constructor(
             when {
                 booking.bookingStarted -> giveUp(booking, ScheduledRunResult.Uncertain)
                 now.isBefore(booking.opensAt.minus(ScheduledBookingRunner.WAKE_UP_BEFORE)) -> alarms.schedule(booking)
-                now.isBefore(booking.startsAt) -> alarms.scheduleSoon(booking)
+                now.isBefore(booking.lastStartsAt) -> alarms.scheduleSoon(booking)
                 else -> giveUp(booking, ScheduledRunResult.Missed)
             }
         }

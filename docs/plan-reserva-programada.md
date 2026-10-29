@@ -18,7 +18,8 @@ apertura, y **respeta el límite** de 2 reservas activas del club.
 ## Funcionamiento
 
 1. **Programar**: elegir día (de los aún cerrados, hasta 14 días por delante), hora de inicio, duración
-   (90/60) y **hasta 3 pistas por orden de preferencia**. Se guarda en el móvil (DataStore) y sobrevive a
+   (90/60), **hasta 3 pistas por orden de preferencia** y, si se quiere, **una hora alternativa** (la segunda
+   hora que se toca; va con borde en lugar de rellena). Se guarda en el móvil (DataStore) y sobrevive a
    reinicios.
 2. **Esperar** con `AlarmManager.setAlarmClock` (la alarma de los despertadores: el sistema no la retrasa ni
    en reposo profundo) a las **8:58** del día de apertura (D − 7), según el reloj del móvil. Dos minutos de
@@ -36,8 +37,9 @@ apertura, y **respeta el límite** de 2 reservas activas del club.
 5. **Reservar** en cuanto el día aparece: el flujo de siempre (pre-reserva, duración, confirmación con "Pagar
    en el club" y comprobación del mensaje de éxito). Si la primera pista no está libre a esa hora, la segunda,
    y luego la tercera; si no sale ninguna, cualquier otra pista libre a esa hora, en el orden de la parrilla
-   (siempre, sin opción para desactivarlo). Nunca más de una reserva por programación. Tarda 1–2 s tras la
-   apertura.
+   (siempre, sin opción para desactivarlo). Si a esa hora no sale ninguna, lo mismo a la hora alternativa: primero
+   la hora y luego la pista (19:00 en las elegidas → 19:00 en cualquier otra → 19:30 en las elegidas → 19:30 en
+   cualquier otra). Nunca más de una reserva por programación. Tarda 1–2 s tras la apertura.
    **Reintentos de la pre-reserva:** la web responde igual (303 a la parrilla, sin mensaje) a un hueco ocupado y
    a uno que aún no deja reservar. El 29/10/2026 la primera parrilla salió a las 8:59:59,7 del club, las dos
    pre-reservas se rechazaron así y las pistas siguieron libres unos minutos (por los ids, las cogieron otros

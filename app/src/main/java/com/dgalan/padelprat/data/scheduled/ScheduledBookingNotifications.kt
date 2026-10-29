@@ -59,15 +59,25 @@ class ScheduledBookingNotifications @Inject constructor(@ApplicationContext priv
         val time = booking.start.format(TIME)
         val day = booking.date.longDate()
         val (title, text) = when (val result = run.result) {
-            is ScheduledRunResult.Booked -> if (result.dryRun) {
-                context.getString(R.string.notification_result_test_title) to
-                    context.getString(R.string.notification_result_test_text, result.court.name, time)
-            } else {
-                context.getString(R.string.notification_result_booked_title) to
-                    context.getString(R.string.notification_result_booked_text, result.court.name, day, time)
+            is ScheduledRunResult.Booked -> {
+                val bookedTime = result.start.format(TIME)
+                if (result.dryRun) {
+                    context.getString(R.string.notification_result_test_title) to
+                        context.getString(R.string.notification_result_test_text, result.court.name, bookedTime)
+                } else {
+                    context.getString(R.string.notification_result_booked_title) to
+                        context.getString(R.string.notification_result_booked_text, result.court.name, day, bookedTime)
+                }
             }
 
-            is ScheduledRunResult.NoCourtFree -> failed(R.string.notification_result_no_court, day, time)
+            is ScheduledRunResult.NoCourtFree -> booking.alternativeStart?.let { alternative ->
+                context.getString(R.string.notification_result_failed_title) to context.getString(
+                    R.string.notification_result_no_court_alternative,
+                    day,
+                    time,
+                    alternative.format(TIME)
+                )
+            } ?: failed(R.string.notification_result_no_court, day, time)
 
             ScheduledRunResult.LimitReached -> failed(R.string.notification_result_limit, day, time)
 
@@ -83,8 +93,12 @@ class ScheduledBookingNotifications @Inject constructor(@ApplicationContext priv
             ScheduledRunResult.Missed -> failed(R.string.notification_result_missed, day, time)
         }
         val details = when (val result = run.result) {
-            is ScheduledRunResult.Booked ->
+            is ScheduledRunResult.Booked -> listOfNotNull(
+                // Se ha reservado a la hora alternativa
+                time.takeIf { result.start != booking.start }
+                    ?.let { context.getString(R.string.notification_result_booked_alternative, it) },
                 if (result.chosen) null else context.getString(R.string.notification_result_booked_other)
+            ).joinToString("\n").ifEmpty { null }
 
             is ScheduledRunResult.NoCourtFree -> noCourtDetails(result)
 
@@ -105,15 +119,26 @@ class ScheduledBookingNotifications @Inject constructor(@ApplicationContext priv
         manager.notify(booking.id.hashCode(), notification)
     }
 
-    /** Qué pasó con cada pista elegida, una por línea, y con las demás que llegaron a salir libres. */
+    /**
+     * Qué pasó con cada pista elegida, una por línea, y con las demás que llegaron a salir libres. Con hora
+     * alternativa, lo de cada hora bajo su propio título.
+     */
     private fun noCourtDetails(result: ScheduledRunResult.NoCourtFree): String {
         val read = context.getString(R.string.notification_timetable_read, result.timetableReadAt.clubTime())
-        val others = if (result.others.isEmpty()) {
-            listOf(context.getString(R.string.notification_others_none))
-        } else {
-            listOf(context.getString(R.string.notification_others_free)) + result.others.map(::courtLine)
+        val times = result.times.flatMap { attempts ->
+            val header = if (result.times.size > 1) {
+                listOf(context.getString(R.string.notification_time_header, attempts.start.format(TIME)))
+            } else {
+                emptyList()
+            }
+            val others = if (attempts.others.isEmpty()) {
+                listOf(context.getString(R.string.notification_others_none))
+            } else {
+                listOf(context.getString(R.string.notification_others_free)) + attempts.others.map(::courtLine)
+            }
+            header + attempts.chosen.map(::courtLine) + others
         }
-        return (listOf(read) + result.chosen.map(::courtLine) + others).joinToString("\n")
+        return (listOf(read) + times).joinToString("\n")
     }
 
     private fun courtLine(attempt: CourtAttempt): String {

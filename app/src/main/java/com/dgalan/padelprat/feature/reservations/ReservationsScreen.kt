@@ -383,6 +383,17 @@ private fun ScheduledCard(booking: ScheduledBooking, onCancelClick: () -> Unit, 
             style = MaterialTheme.typography.titleLarge,
             color = scheme.onSurface
         )
+        booking.alternativeStart?.let { alternative ->
+            Text(
+                text = stringResource(
+                    R.string.reservations_scheduled_alternative,
+                    alternative.hourText(),
+                    alternative.plusMinutes(booking.durationMinutes.toLong()).hourText()
+                ),
+                style = MaterialTheme.typography.bodyMedium,
+                color = scheme.onSurfaceVariant
+            )
+        }
         Text(
             text = (booking.courts.map { it.name } + stringResource(R.string.reservations_scheduled_any_court))
                 .joinToString(" → "),
