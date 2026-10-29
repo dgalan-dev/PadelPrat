@@ -1,3 +1,6 @@
+import groovy.json.JsonSlurper
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -5,7 +8,27 @@ plugins {
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
     alias(libs.plugins.ktlint)
+    // Lee app/google-services.json, que no está en el repositorio: en el CI sale del secreto GOOGLE_SERVICES_JSON_BASE64
+    alias(libs.plugins.google.services)
 }
+
+// Clave de la cuenta de servicio padelprat-fcm, que solo puede enviar mensajes de FCM (ver docs/plan-reservas-amigo.md).
+// El workflow de releases pasa la ruta con la propiedad padelpratFcmServiceAccount; en local va en local.properties como
+// padelprat.fcmServiceAccount. Sin ella la app compila igual, pero no avisa al amigo de los cambios
+val localProperties = Properties().apply {
+    providers.fileContents(rootProject.layout.projectDirectory.file("local.properties")).asText.orNull
+        ?.let { load(it.reader()) }
+}
+val fcmServiceAccount: Map<*, *> = (
+    providers.gradleProperty("padelpratFcmServiceAccount").orNull
+        ?: localProperties.getProperty("padelprat.fcmServiceAccount")
+    )
+    ?.let { path -> JsonSlurper().parseText(providers.fileContents(layout.projectDirectory.file(path)).asText.get()) }
+    .let { it as? Map<*, *> }
+    .orEmpty()
+
+fun buildConfigString(value: Any?): String =
+    "\"" + value?.toString().orEmpty().replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n") + "\""
 
 android {
     namespace = "com.dgalan.padelprat"
@@ -22,6 +45,9 @@ android {
 
         // Web de reservas del club (Syltek). Ver docs/syltek-api.md
         buildConfigField("String", "BASE_URL", "\"https://prat.syltek.com/\"")
+        buildConfigField("String", "FCM_PROJECT_ID", buildConfigString(fcmServiceAccount["project_id"]))
+        buildConfigField("String", "FCM_CLIENT_EMAIL", buildConfigString(fcmServiceAccount["client_email"]))
+        buildConfigField("String", "FCM_PRIVATE_KEY", buildConfigString(fcmServiceAccount["private_key"]))
     }
 
     // Firma de las releases: solo en el workflow de releases (.github/workflows/release.yml), que pasa la clave con
@@ -90,6 +116,14 @@ dependencies {
     implementation(libs.tink.android)
     implementation(libs.androidx.core.splashscreen)
     implementation(libs.jsoup)
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.auth)
+    implementation(libs.firebase.firestore)
+    implementation(libs.firebase.messaging)
+    implementation(libs.kotlinx.coroutines.play.services)
+    implementation(libs.androidx.credentials)
+    implementation(libs.androidx.credentials.play.services.auth)
+    implementation(libs.googleid)
     debugImplementation(libs.androidx.compose.ui.tooling)
     ktlintRuleset(libs.compose.rules.ktlint)
 }

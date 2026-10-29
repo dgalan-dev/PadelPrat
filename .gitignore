@@ -9,3 +9,5 @@
 .externalNativeBuild
 .cxx
 local.properties
+# Configuración de Firebase: el repositorio es público; en el CI sale del secreto GOOGLE_SERVICES_JSON_BASE64
+/app/google-services.json

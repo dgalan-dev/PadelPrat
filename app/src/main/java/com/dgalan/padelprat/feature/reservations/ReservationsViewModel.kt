@@ -2,6 +2,8 @@ package com.dgalan.padelprat.feature.reservations
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.dgalan.padelprat.data.friends.FriendReservations
+import com.dgalan.padelprat.data.friends.SharedReservationsRepository
 import com.dgalan.padelprat.data.reservations.CancelResult
 import com.dgalan.padelprat.data.reservations.Reservation
 import com.dgalan.padelprat.data.reservations.ReservationStatus
@@ -24,6 +26,9 @@ import kotlinx.coroutines.launch
 enum class ReservationsTab { Upcoming, Past, Cancelled }
 
 enum class ReservationsError { Network, Unknown }
+
+/** Qué reservas se ven en Próximas cuando hay reservas compartidas con el amigo. */
+enum class OwnerFilter { All, Mine, Friend }
 
 sealed interface ReservationsContent {
     data object Loading : ReservationsContent
@@ -49,7 +54,10 @@ data class ReservationsUiState(
     val cancelDialog: CancelDialog? = null,
     val message: CancelMessage? = null,
     /** Reservas programadas que aún no se han intentado; se muestran arriba de las próximas. */
-    val scheduled: List<ScheduledBooking> = emptyList()
+    val scheduled: List<ScheduledBooking> = emptyList(),
+    /** Las próximas del amigo; `null` si las reservas compartidas no están activadas (o no se han podido leer). */
+    val friend: FriendReservations? = null,
+    val ownerFilter: OwnerFilter = OwnerFilter.All
 )
 
 @HiltViewModel
@@ -57,16 +65,19 @@ class ReservationsViewModel @Inject constructor(
     private val repository: ReservationsRepository,
     changeNotifier: ReservationsChangeNotifier,
     private val scheduledRepository: ScheduledBookingRepository,
-    private val scheduledAlarms: ScheduledBookingAlarms
+    private val scheduledAlarms: ScheduledBookingAlarms,
+    private val sharedReservations: SharedReservationsRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ReservationsUiState())
     val uiState: StateFlow<ReservationsUiState> = _uiState.asStateFlow()
 
     private var loadJob: Job? = null
+    private var friendJob: Job? = null
 
     init {
         load()
+        observeFriend()
         // Al reservar desde la parrilla o al anular aquí, se recarga solo
         viewModelScope.launch { changeNotifier.changes.collect { load() } }
         viewModelScope.launch {
@@ -78,9 +89,31 @@ class ReservationsViewModel @Inject constructor(
         _uiState.update { it.copy(tab = tab) }
     }
 
-    fun onRefresh() = load()
+    fun onOwnerFilterSelect(filter: OwnerFilter) {
+        _uiState.update { it.copy(ownerFilter = filter) }
+    }
 
-    fun onRetry() = load()
+    fun onRefresh() {
+        load()
+        observeFriend()
+    }
+
+    fun onRetry() = onRefresh()
+
+    /** Se vuelve a empezar al refrescar, por si entretanto se ha activado o se ha dado el alta en la consola. */
+    private fun observeFriend() {
+        friendJob?.cancel()
+        friendJob = viewModelScope.launch {
+            sharedReservations.friendReservations.collect { friend ->
+                _uiState.update { state ->
+                    state.copy(
+                        friend = friend,
+                        ownerFilter = if (friend == null) OwnerFilter.All else state.ownerFilter
+                    )
+                }
+            }
+        }
+    }
 
     fun onCancelClick(reservation: Reservation) {
         _uiState.update { it.copy(cancelDialog = CancelDialog(reservation)) }

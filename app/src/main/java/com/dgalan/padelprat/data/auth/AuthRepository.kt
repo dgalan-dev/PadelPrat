@@ -3,6 +3,7 @@ package com.dgalan.padelprat.data.auth
 import com.dgalan.padelprat.core.network.PersistentCookieJar
 import com.dgalan.padelprat.core.network.SessionExpiredNotifier
 import com.dgalan.padelprat.core.network.Syltek
+import com.dgalan.padelprat.data.friends.FriendAuthRepository
 import com.dgalan.padelprat.data.profile.ProfileRepository
 import com.dgalan.padelprat.data.reminders.ReminderRepository
 import java.io.IOException
@@ -23,7 +24,8 @@ class AuthRepository @Inject constructor(
     private val cookieJar: PersistentCookieJar,
     private val sessionExpiredNotifier: SessionExpiredNotifier,
     private val profileRepository: ProfileRepository,
-    private val reminderRepository: ReminderRepository
+    private val reminderRepository: ReminderRepository,
+    private val friendAuthRepository: FriendAuthRepository
 ) {
 
     /** `true` mientras haya una cookie de sesión guardada y sin caducar. */
@@ -64,5 +66,7 @@ class AuthRepository @Inject constructor(
         sessionExpiredNotifier.reset()
         profileRepository.clear()
         reminderRepository.clear()
+        // Las reservas compartidas van con este usuario: el siguiente tendría que activarlas con su cuenta
+        friendAuthRepository.signOut()
     }
 }

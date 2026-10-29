@@ -77,6 +77,10 @@
     <string name="notification_channel_running">Reserva programada en curso</string>
     <string name="notification_channel_result">Resultado de las reservas programadas</string>
     <string name="notification_channel_reminders">Avisos de las reservas</string>
+    <string name="notification_channel_friend">Reservas de tu amigo</string>
+    <!-- "Marc ha reservado" -->
+    <string name="notification_friend_booked_title">🎾 %1$s ha reservado</string>
+    <string name="notification_friend_cancelled_title">%1$s ha anulado una reserva</string>
     <string name="reminder_match_title">🎾 Hoy juegas a las %1$s</string>
     <string name="reminder_hours">%1$s – %2$s</string>
     <string name="reminder_court_sponsor">%1$s · %2$s</string>
@@ -201,6 +205,27 @@
     <string name="reservations_empty_past">No tienes reservas en los últimos 6 meses</string>
     <string name="reservations_empty_cancelled">No tienes reservas anuladas</string>
     <string name="reservations_error_unknown">No se han podido cargar tus reservas</string>
+    <!-- Reservas compartidas con el amigo: de quién es cada tarjeta -->
+    <string name="reservations_owner_me">Tú</string>
+    <string name="reservations_owner_me_avatar">Yo</string>
+    <!-- Si en la consola no se ha puesto su nombre -->
+    <string name="reservations_friend_default">Tu amigo</string>
+    <string name="reservations_filter_all">Todas</string>
+    <string name="reservations_filter_mine">Mías</string>
+    <!-- "De Marc" -->
+    <string name="reservations_filter_friend">De %1$s</string>
+    <!-- "Las de Marc se actualizaron hace 5 min" -->
+    <string name="reservations_friend_updated">Las de %1$s se actualizaron %2$s</string>
+    <string name="reservations_updated_now">ahora mismo</string>
+    <string name="reservations_updated_minutes">hace %1$d min</string>
+    <string name="reservations_updated_hours">hace %1$d h</string>
+    <plurals name="reservations_updated_days">
+        <item quantity="one">hace %d día</item>
+        <item quantity="other">hace %d días</item>
+        <item quantity="many">hace %d días</item>
+    </plurals>
+    <!-- "Marc no tiene próximas reservas" -->
+    <string name="reservations_empty_friend">%1$s no tiene próximas reservas</string>
     <string name="profile_title">Perfil</string>
     <string name="profile_logout">Cerrar sesión</string>
     <string name="profile_logout_title">¿Cerrar sesión?</string>
@@ -217,6 +242,20 @@
     <string name="profile_reminder_match_text">3 horas antes de empezar</string>
     <string name="profile_reminder_cancel">Último día para anular</string>
     <string name="profile_reminder_cancel_text">El día anterior a las 10:00 y a las 21:00, mientras aún se puede anular sin cargos</string>
+    <string name="profile_sharing">Reservas compartidas</string>
+    <string name="profile_sharing_switch">Ver las reservas de tu amigo</string>
+    <string name="profile_sharing_off_text">Comparte tus próximas reservas con tu amigo y ve las suyas. Se activa con tu cuenta de Google.</string>
+    <string name="profile_sharing_loading_text">Comprobando…</string>
+    <!-- "Activadas con marc@gmail.com" -->
+    <string name="profile_sharing_active_text">Activadas con %1$s</string>
+    <string name="profile_sharing_pending_text">Has entrado con %1$s, pero todavía no te han dado de alta. Cuando lo hagan, vuelve a comprobarlo.</string>
+    <string name="profile_sharing_unknown_text">Has entrado con %1$s, pero no se ha podido comprobar el alta. Revisa tu conexión.</string>
+    <string name="profile_sharing_check">Comprobar de nuevo</string>
+    <string name="profile_sharing_alerts">Avisarme de sus cambios</string>
+    <string name="profile_sharing_alerts_text">Cuando tu amigo reserve o anule una pista</string>
+    <string name="profile_sharing_error_no_account">No hay ninguna cuenta de Google en el móvil. Añade una en los ajustes y vuelve a intentarlo.</string>
+    <string name="profile_sharing_error_network">No hay conexión. Revisa tu internet y vuelve a intentarlo.</string>
+    <string name="profile_sharing_error_unknown">No se ha podido entrar con Google. Vuelve a intentarlo más tarde.</string>
     <string name="update_title">Nueva versión disponible</string>
     <!-- "Ya está disponible la versión 1.1.0 (tienes la 1.0.0). Para seguir usando la app, actualízala." -->
     <string name="update_text">Ya está disponible la versión %1$s (tienes la %2$s). Para seguir usando la app, actualízala.</string>

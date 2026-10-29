@@ -1,6 +1,7 @@
 package com.dgalan.padelprat.data.reservations
 
 import com.dgalan.padelprat.core.network.Syltek
+import com.dgalan.padelprat.data.friends.SharedReservationsRepository
 import com.dgalan.padelprat.data.reminders.ReminderRepository
 import java.time.LocalDateTime
 import javax.inject.Inject
@@ -55,7 +56,8 @@ sealed interface ReservationCheck {
 class ReservationsRepository @Inject constructor(
     private val remote: ReservationsRemoteDataSource,
     private val changeNotifier: ReservationsChangeNotifier,
-    private val reminders: ReminderRepository
+    private val reminders: ReminderRepository,
+    private val sharedReservations: SharedReservationsRepository
 ) {
 
     private val cancelMutex = Mutex()
@@ -73,13 +75,18 @@ class ReservationsRepository @Inject constructor(
         list()
     }
 
-    /** El listado de la web. Cada vez que llega se actualizan el contador de activas y los avisos. */
-    private suspend fun list(): ReservationsStep<List<Reservation>> = remote.list().also { step ->
-        if (step is ReservationsStep.Ok) {
-            updateActiveCount(step.value)
-            reminders.sync(step.value)
+    /**
+     * El listado de la web. Cada vez que llega se actualizan el contador de activas, los avisos y las reservas
+     * compartidas con el amigo; [publish] en `false` si quien llama las publica después con las pistas.
+     */
+    private suspend fun list(publish: Boolean = true): ReservationsStep<List<Reservation>> =
+        remote.list().also { step ->
+            if (step is ReservationsStep.Ok) {
+                updateActiveCount(step.value)
+                reminders.sync(step.value)
+                if (publish) sharedReservations.publish(step.value)
+            }
         }
-    }
 
     private fun updateActiveCount(reservations: List<Reservation>) {
         val now = LocalDateTime.now(Syltek.ZONE)
@@ -91,10 +98,17 @@ class ReservationsRepository @Inject constructor(
      * (una petición por reserva: suelen ser pocas). Las pasadas y anuladas se dejan sin pista para no lanzar decenas
      * de peticiones.
      */
-    suspend fun reservations(): ReservationsResult = when (val step = list()) {
-        is ReservationsStep.Ok -> ReservationsResult.Success(withCourts(step.value))
+    suspend fun reservations(): ReservationsResult = when (val step = list(publish = false)) {
+        is ReservationsStep.Ok -> {
+            val reservations = withCourts(step.value)
+            sharedReservations.publish(reservations)
+            ReservationsResult.Success(reservations)
+        }
+
         ReservationsStep.NetworkError -> ReservationsResult.NetworkError
+
         ReservationsStep.SessionExpired -> ReservationsResult.SessionExpired
+
         ReservationsStep.UnknownError -> ReservationsResult.UnknownError
     }
 

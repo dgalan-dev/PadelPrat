@@ -35,11 +35,24 @@ jobs:
         env:
           RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
 
+      # No está en el repositorio, que es público; sin él no compila
+      - name: Decode google-services.json
+        run: echo "$GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > app/google-services.json
+        env:
+          GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}
+
+      # Clave de la cuenta de servicio padelprat-fcm (solo FCM): con ella la app avisa al amigo de los cambios
+      - name: Decode FCM service account
+        run: echo "$FCM_SERVICE_ACCOUNT_BASE64" | base64 --decode > "$RUNNER_TEMP/fcm.json"
+        env:
+          FCM_SERVICE_ACCOUNT_BASE64: ${{ secrets.FCM_SERVICE_ACCOUNT_BASE64 }}
+
       - name: Build
         run: ./gradlew ktlintCheck lintDebug assembleRelease
         env:
           ORG_GRADLE_PROJECT_padelpratStoreFile: ${{ runner.temp }}/release.jks
           ORG_GRADLE_PROJECT_padelpratStorePassword: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          ORG_GRADLE_PROJECT_padelpratFcmServiceAccount: ${{ runner.temp }}/fcm.json
 
       # Sin firma, Gradle lo llamaría app-release-unsigned.apk y este paso fallaría
       - name: Publish
@@ -50,6 +63,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
 
-      - name: Remove keystore
+      - name: Remove keys
         if: always()
-        run: rm -f "$RUNNER_TEMP/release.jks"
+        run: rm -f "$RUNNER_TEMP/release.jks" "$RUNNER_TEMP/fcm.json"

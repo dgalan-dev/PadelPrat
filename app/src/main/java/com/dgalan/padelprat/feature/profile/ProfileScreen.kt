@@ -34,6 +34,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -52,11 +53,17 @@ import com.dgalan.padelprat.ui.theme.PadelPratTheme
 @Composable
 fun ProfileScreen(modifier: Modifier = Modifier, viewModel: ProfileViewModel = hiltViewModel()) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    // La Activity: el selector de cuentas de Google se muestra encima
+    val context = LocalContext.current
     ProfileContent(
         uiState = uiState,
         onRetry = viewModel::onRetry,
         onMatchRemindersChange = viewModel::onMatchRemindersChange,
         onCancelRemindersChange = viewModel::onCancelRemindersChange,
+        onSharingEnable = { viewModel.onSharingEnable(context) },
+        onSharingDisable = viewModel::onSharingDisable,
+        onSharingCheck = viewModel::onSharingCheck,
+        onFriendAlertsChange = viewModel::onFriendAlertsChange,
         onLogoutClick = viewModel::onLogoutClick,
         modifier = modifier
     )
@@ -69,6 +76,10 @@ private fun ProfileContent(
     onRetry: () -> Unit,
     onMatchRemindersChange: (Boolean) -> Unit,
     onCancelRemindersChange: (Boolean) -> Unit,
+    onSharingEnable: () -> Unit,
+    onSharingDisable: () -> Unit,
+    onSharingCheck: () -> Unit,
+    onFriendAlertsChange: (Boolean) -> Unit,
     onLogoutClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -104,6 +115,17 @@ private fun ProfileContent(
             cancelReminders = uiState.cancelReminders,
             onMatchRemindersChange = onMatchRemindersChange,
             onCancelRemindersChange = onCancelRemindersChange
+        )
+
+        Spacer(Modifier.height(24.dp))
+        Sharing(
+            state = uiState.sharing,
+            error = uiState.sharingError,
+            friendAlerts = uiState.friendAlerts,
+            onEnable = onSharingEnable,
+            onDisable = onSharingDisable,
+            onCheck = onSharingCheck,
+            onFriendAlertsChange = onFriendAlertsChange
         )
 
         Spacer(Modifier.height(32.dp))
@@ -262,8 +284,94 @@ private fun Reminders(
     }
 }
 
+/** Reservas compartidas con el amigo: se activan con la cuenta de Google y el alta se hace en la consola. */
 @Composable
-private fun SwitchRow(title: String, text: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+private fun Sharing(
+    state: SharingState,
+    error: SharingError?,
+    friendAlerts: Boolean,
+    onEnable: () -> Unit,
+    onDisable: () -> Unit,
+    onCheck: () -> Unit,
+    onFriendAlertsChange: (Boolean) -> Unit
+) {
+    Column {
+        Text(
+            text = stringResource(R.string.profile_sharing),
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(8.dp))
+        PadelCard {
+            Column {
+                val text = when (state) {
+                    SharingState.Off -> stringResource(R.string.profile_sharing_off_text)
+
+                    SharingState.Loading -> stringResource(R.string.profile_sharing_loading_text)
+
+                    is SharingState.Active -> stringResource(
+                        R.string.profile_sharing_active_text,
+                        state.email.orEmpty()
+                    )
+
+                    is SharingState.Pending -> stringResource(
+                        R.string.profile_sharing_pending_text,
+                        state.email.orEmpty()
+                    )
+
+                    is SharingState.Unknown -> stringResource(
+                        R.string.profile_sharing_unknown_text,
+                        state.email.orEmpty()
+                    )
+                }
+                SwitchRow(
+                    title = stringResource(R.string.profile_sharing_switch),
+                    text = text,
+                    checked = state != SharingState.Off,
+                    onCheckedChange = { if (it) onEnable() else onDisable() },
+                    enabled = state != SharingState.Loading
+                )
+                if (state is SharingState.Active) {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    SwitchRow(
+                        title = stringResource(R.string.profile_sharing_alerts),
+                        text = stringResource(R.string.profile_sharing_alerts_text),
+                        checked = friendAlerts,
+                        onCheckedChange = onFriendAlertsChange
+                    )
+                }
+                if (state is SharingState.Pending || state is SharingState.Unknown) {
+                    TextButton(onClick = onCheck, modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)) {
+                        Text(stringResource(R.string.profile_sharing_check))
+                    }
+                }
+                error?.let {
+                    Text(
+                        text = stringResource(it.textRes()),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+private fun SharingError.textRes(): Int = when (this) {
+    SharingError.NoGoogleAccount -> R.string.profile_sharing_error_no_account
+    SharingError.Network -> R.string.profile_sharing_error_network
+    SharingError.Unknown -> R.string.profile_sharing_error_unknown
+}
+
+@Composable
+private fun SwitchRow(
+    title: String,
+    text: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    enabled: Boolean = true
+) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -273,7 +381,7 @@ private fun SwitchRow(title: String, text: String, checked: Boolean, onCheckedCh
             Text(title, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
             Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
+        Switch(checked = checked, onCheckedChange = onCheckedChange, enabled = enabled)
     }
 }
 
@@ -327,6 +435,10 @@ private fun ProfileContentPreview() {
             onRetry = {},
             onMatchRemindersChange = {},
             onCancelRemindersChange = {},
+            onSharingEnable = {},
+            onSharingDisable = {},
+            onSharingCheck = {},
+            onFriendAlertsChange = {},
             onLogoutClick = {}
         )
     }

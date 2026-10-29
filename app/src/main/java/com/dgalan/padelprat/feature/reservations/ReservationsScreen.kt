@@ -1,7 +1,9 @@
 package com.dgalan.padelprat.feature.reservations
 
 import android.content.Intent
+import android.content.res.Configuration
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,12 +19,13 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -56,6 +59,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dgalan.padelprat.BuildConfig
 import com.dgalan.padelprat.R
 import com.dgalan.padelprat.core.network.Syltek
+import com.dgalan.padelprat.data.friends.FriendReservations
 import com.dgalan.padelprat.data.reservations.Reservation
 import com.dgalan.padelprat.data.reservations.ReservationCourt
 import com.dgalan.padelprat.data.reservations.ReservationStatus
@@ -75,6 +79,7 @@ import com.dgalan.padelprat.ui.format.shortName
 import com.dgalan.padelprat.ui.theme.PadelPratTheme
 import com.dgalan.padelprat.ui.theme.padelColors
 import java.time.Duration
+import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
 
@@ -91,6 +96,7 @@ fun ReservationsScreen(
         uiState = uiState,
         onBookClick = onBookClick,
         onTabSelect = viewModel::onTabSelect,
+        onOwnerFilterSelect = viewModel::onOwnerFilterSelect,
         onCancelClick = viewModel::onCancelClick,
         onScheduleCancel = viewModel::onScheduleCancel,
         onScheduleTest = viewModel::onScheduleTest,
@@ -116,6 +122,7 @@ private fun ReservationsContent(
     uiState: ReservationsUiState,
     onBookClick: () -> Unit,
     onTabSelect: (ReservationsTab) -> Unit,
+    onOwnerFilterSelect: (OwnerFilter) -> Unit,
     onCancelClick: (Reservation) -> Unit,
     onScheduleCancel: (String) -> Unit,
     onScheduleTest: (String) -> Unit,
@@ -154,6 +161,11 @@ private fun ReservationsContent(
                     .padding(horizontal = 16.dp)
             )
             Spacer(Modifier.height(12.dp))
+            val friend = uiState.friend
+            if (friend != null && uiState.tab == ReservationsTab.Upcoming) {
+                FriendFilter(friend = friend, selected = uiState.ownerFilter, onSelect = onOwnerFilterSelect)
+                Spacer(Modifier.height(12.dp))
+            }
             // Nunca se queda "refrescando": al soltar se recarga y lo que se ve son las siluetas de carga
             PullToRefreshBox(isRefreshing = false, onRefresh = onRefresh, modifier = Modifier.fillMaxSize()) {
                 when (val content = uiState.content) {
@@ -178,6 +190,8 @@ private fun ReservationsContent(
                             tab = uiState.tab,
                             content = content,
                             scheduled = uiState.scheduled,
+                            friend = uiState.friend,
+                            ownerFilter = uiState.ownerFilter,
                             onCancelClick = onCancelClick,
                             onScheduleCancel = onScheduleCancel,
                             onScheduleTest = onScheduleTest,
@@ -195,23 +209,49 @@ private fun ReservationsContent(
     }
 }
 
+/** De quién es una reserva, cuando las reservas compartidas están activadas. */
+private data class Owner(val name: String, val isFriend: Boolean)
+
 @Composable
 private fun ReservationList(
     tab: ReservationsTab,
     content: ReservationsContent.Loaded,
     scheduled: List<ScheduledBooking>,
+    friend: FriendReservations?,
+    ownerFilter: OwnerFilter,
     onCancelClick: (Reservation) -> Unit,
     onScheduleCancel: (String) -> Unit,
     onScheduleTest: (String) -> Unit,
     onBookClick: () -> Unit
 ) {
-    val reservations = when (tab) {
-        ReservationsTab.Upcoming -> content.upcoming
+    // Las del amigo solo en Próximas, mezcladas por fecha con las mías
+    val sharing = tab == ReservationsTab.Upcoming && friend != null
+    val friendName = friend?.name ?: stringResource(R.string.reservations_friend_default)
+    val mine = when (tab) {
+        ReservationsTab.Upcoming -> if (sharing && ownerFilter == OwnerFilter.Friend) emptyList() else content.upcoming
         ReservationsTab.Past -> content.past
         ReservationsTab.Cancelled -> content.cancelled
     }
-    // Las programadas solo en Próximas, encima de las reservas reales
-    val shownScheduled = if (tab == ReservationsTab.Upcoming) scheduled else emptyList()
+    val friends = if (sharing && ownerFilter != OwnerFilter.Mine) {
+        val now = LocalDateTime.now(Syltek.ZONE)
+        friend.reservations.filter { it.end > now }
+    } else {
+        emptyList()
+    }
+    val reservations = (mine.map { it to false } + friends.map { it to true })
+        .let { if (sharing) it.sortedBy { (reservation, _) -> reservation.start } else it }
+    // La más cercana de las mías va destacada, como en el mock
+    val nearest = mine.firstOrNull()
+    // Las programadas (solo mías) en Próximas, encima de las reservas reales
+    val showScheduled = tab == ReservationsTab.Upcoming && !(sharing && ownerFilter == OwnerFilter.Friend)
+    val shownScheduled = if (showScheduled) scheduled else emptyList()
+    if (reservations.isEmpty() && shownScheduled.isEmpty() && sharing && ownerFilter == OwnerFilter.Friend) {
+        ScrollableMessage(
+            icon = R.drawable.ic_ball,
+            title = stringResource(R.string.reservations_empty_friend, friendName)
+        )
+        return
+    }
     if (reservations.isEmpty() && shownScheduled.isEmpty()) {
         // En Próximas, el siguiente paso es reservar
         val upcoming = tab == ReservationsTab.Upcoming
@@ -239,10 +279,21 @@ private fun ReservationList(
                 onTestClick = { onScheduleTest(booking.id) }
             )
         }
-        itemsIndexed(reservations, key = { _, reservation -> reservation.id }) { index, reservation ->
+        items(
+            reservations,
+            key = { (reservation, isFriend) -> if (isFriend) "friend-${reservation.id}" else reservation.id }
+        ) { (reservation, isFriend) ->
             when (tab) {
-                // La más cercana va destacada, como en el mock
-                ReservationsTab.Upcoming -> UpcomingCard(reservation, highlighted = index == 0, onCancelClick)
+                ReservationsTab.Upcoming -> UpcomingCard(
+                    reservation = reservation,
+                    highlighted = !isFriend && reservation == nearest,
+                    owner = when {
+                        !sharing -> null
+                        isFriend -> Owner(friendName, isFriend = true)
+                        else -> Owner(stringResource(R.string.reservations_owner_me), isFriend = false)
+                    },
+                    onCancelClick = onCancelClick
+                )
 
                 ReservationsTab.Past -> PastCard(reservation)
 
@@ -252,13 +303,20 @@ private fun ReservationList(
     }
 }
 
+/** [owner], solo con las reservas compartidas activadas. Las del amigo llegan con `canCancel` en `false`. */
 @Composable
-private fun UpcomingCard(reservation: Reservation, highlighted: Boolean, onCancelClick: (Reservation) -> Unit) {
+private fun UpcomingCard(
+    reservation: Reservation,
+    highlighted: Boolean,
+    owner: Owner?,
+    onCancelClick: (Reservation) -> Unit
+) {
     val lime = MaterialTheme.padelColors.accent
     val onLime = MaterialTheme.padelColors.onAccent
     ReservationCard(border = if (highlighted) BorderStroke(2.dp, lime) else defaultCardBorder()) {
         if (highlighted) {
             Row(verticalAlignment = Alignment.CenterVertically) {
+                owner?.let { OwnerLabel(it) }
                 Tag(text = reservation.start.toLocalDate().dayTag(), containerColor = lime, contentColor = onLime)
                 Spacer(Modifier.weight(1f))
                 Text(
@@ -268,11 +326,14 @@ private fun UpcomingCard(reservation: Reservation, highlighted: Boolean, onCance
                 )
             }
         } else {
-            Text(
-                text = reservation.start.toLocalDate().longDate(),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                owner?.let { OwnerLabel(it) }
+                Text(
+                    text = reservation.start.toLocalDate().longDate(),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
         Text(
             text = reservation.timeRange(),
@@ -302,6 +363,90 @@ private fun UpcomingCard(reservation: Reservation, highlighted: Boolean, onCance
                     Text(stringResource(R.string.reservations_cancel))
                 }
             }
+        }
+    }
+}
+
+/** Círculo con la inicial y el nombre: azul para las mías, lima para las del amigo. */
+@Composable
+private fun OwnerLabel(owner: Owner) {
+    val (container, content) = if (owner.isFriend) {
+        MaterialTheme.padelColors.accent to MaterialTheme.padelColors.onAccent
+    } else {
+        MaterialTheme.colorScheme.primary to MaterialTheme.colorScheme.onPrimary
+    }
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(end = 8.dp)) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(22.dp)
+                .background(container, CircleShape)
+        ) {
+            Text(
+                text = if (owner.isFriend) {
+                    owner.name.take(1).uppercase(SPANISH)
+                } else {
+                    stringResource(R.string.reservations_owner_me_avatar)
+                },
+                style = MaterialTheme.typography.labelSmall,
+                color = content
+            )
+        }
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = owner.name,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+    }
+}
+
+/** Filtro de Próximas (todas, mías o del amigo) y cuándo publicó el amigo sus reservas por última vez. */
+@Composable
+private fun FriendFilter(friend: FriendReservations, selected: OwnerFilter, onSelect: (OwnerFilter) -> Unit) {
+    val name = friend.name ?: stringResource(R.string.reservations_friend_default)
+    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OwnerFilter.entries.forEach { filter ->
+                FilterChip(
+                    selected = filter == selected,
+                    onClick = { onSelect(filter) },
+                    label = {
+                        Text(
+                            when (filter) {
+                                OwnerFilter.All -> stringResource(R.string.reservations_filter_all)
+                                OwnerFilter.Mine -> stringResource(R.string.reservations_filter_mine)
+                                OwnerFilter.Friend -> stringResource(R.string.reservations_filter_friend, name)
+                            }
+                        )
+                    }
+                )
+            }
+        }
+        friend.updatedAt?.let {
+            Text(
+                text = stringResource(R.string.reservations_friend_updated, name, it.updatedAgo()),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+/** "ahora mismo", "hace 5 min", "hace 3 h" o "hace 2 días". */
+@Composable
+private fun Instant.updatedAgo(): String {
+    val minutes = Duration.between(this, Instant.now()).toMinutes().coerceAtLeast(0)
+    return when {
+        minutes < 1 -> stringResource(R.string.reservations_updated_now)
+
+        minutes < 60 -> stringResource(R.string.reservations_updated_minutes, minutes.toInt())
+
+        minutes < 24 * 60 -> stringResource(R.string.reservations_updated_hours, (minutes / 60).toInt())
+
+        else -> {
+            val days = (minutes / (24 * 60)).toInt()
+            pluralStringResource(R.plurals.reservations_updated_days, days, days)
         }
     }
 }
@@ -611,6 +756,7 @@ private fun CancelMessage.textRes(): Int = when (this) {
 }
 
 @Preview(showBackground = true)
+@Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun ReservationsContentPreview() {
     val start = LocalDate.now(Syltek.ZONE).plusDays(1).atTime(18, 30)
@@ -628,13 +774,27 @@ private fun ReservationsContentPreview() {
         ReservationsContent(
             uiState = ReservationsUiState(
                 content = ReservationsContent.Loaded(
-                    upcoming = listOf(reservation, reservation.copy(id = 2, start = start.plusDays(2))),
+                    upcoming = listOf(reservation, reservation.copy(id = 2, start = start.plusDays(3))),
                     past = emptyList(),
                     cancelled = emptyList()
+                ),
+                friend = FriendReservations(
+                    name = "Marc",
+                    updatedAt = Instant.now().minusSeconds(5 * 60),
+                    reservations = listOf(
+                        reservation.copy(
+                            id = 3,
+                            start = start.plusDays(1).withHour(20),
+                            total = null,
+                            canCancel = false,
+                            court = ReservationCourt("Pista 5", null)
+                        )
+                    )
                 )
             ),
             onBookClick = {},
             onTabSelect = {},
+            onOwnerFilterSelect = {},
             onCancelClick = {},
             onScheduleCancel = {},
             onScheduleTest = {},
