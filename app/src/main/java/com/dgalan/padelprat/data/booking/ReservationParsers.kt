@@ -55,6 +55,15 @@ object ReservationParsers {
     }
 
     /**
+     * Aviso que enseña la parrilla tras rechazar una pre-reserva (303 a la parrilla), p. ej. "No hay disponibilidad
+     * para la instalación y horas seleccionadas. No se pueden dejar espacios libres menores de 60 minutos." Sale una
+     * sola vez, en la primera carga tras la redirección. `null` si no trae ninguno.
+     */
+    fun parseRefusal(html: String): String? = Jsoup.parse(html)
+        .selectFirst(".clientNotification .message")
+        ?.text()?.trim()?.ifEmpty { null }
+
+    /**
      * Mensaje de error que la web muestra en la página (p. ej. al superar el límite de reservas del club). Usa el
      * mismo aviso que el error del login (`.c-message-indicator--danger`), o el de advertencia si es ese el que sale.
      * `null` si la página no trae ninguno.

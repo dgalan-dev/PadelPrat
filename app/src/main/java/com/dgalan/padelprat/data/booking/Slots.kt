@@ -24,7 +24,10 @@ enum class SlotState {
     /** Se puede reservar: cabe la duración pedida hasta la siguiente reserva o el cierre. */
     Free,
 
-    /** Ocupado por otra reserva, o libre pero sin tiempo suficiente para reservar. */
+    /**
+     * Ocupado por otra reserva, o libre pero sin tiempo suficiente para reservar o dejando un hueco libre de menos de
+     * [Syltek.MIN_FREE_GAP_MINUTES] antes o después, que la web no permite.
+     */
     Unavailable
 }
 
@@ -57,6 +60,10 @@ val BOOKING_DURATIONS = listOf(90, 60)
  * Calcula los huecos de cada pista a partir de la parrilla (ver docs/syltek-api.md, apartado 4.6): recorre sus
  * tramos en pasos de `interval` minutos y marca cada inicio como libre, ocupado o propio. Se omiten los inicios que
  * ya han pasado y los posteriores al límite de reserva. Las reservas propias van aparte, en [CourtSlots.mine].
+ *
+ * Un inicio solo es libre si la reserva no deja un hueco de menos de [Syltek.MIN_FREE_GAP_MINUTES] hasta la reserva
+ * anterior o la apertura, ni hasta la siguiente o el cierre. Los huecos que ya han pasado también cuentan: no se sabe
+ * si la web los descarta, así que se aplica igual.
  */
 object SlotCalculator {
 
@@ -90,6 +97,7 @@ object SlotCalculator {
     private fun courtSlots(court: Court, timetable: DayTimetable, durationMinutes: Int): List<Slot> {
         val bookings = timetable.bookings.filter { it.courtId == court.id }.sortedBy { it.start }
         val closing = court.periods.maxOfOrNull { timetable.endInstant(it.end) } ?: return emptyList()
+        val opening = court.periods.minOf { timetable.instantAt(it.start) }
 
         return court.periods
             .flatMap { period -> period.starts() }
@@ -106,10 +114,16 @@ object SlotCalculator {
                     booking != null -> Slot(start, time, SlotState.Unavailable, maxMinutes = 0)
 
                     else -> {
+                        val previousEnd =
+                            bookings.filter { it.end <= start }.maxOfOrNull { it.end }?.coerceAtLeast(opening)
+                                ?: opening
                         val nextBusy =
                             bookings.firstOrNull { it.start > start }?.start?.coerceAtMost(closing) ?: closing
                         val minutes = Duration.between(start, nextBusy).toMinutes().toInt()
-                        val state = if (minutes >= durationMinutes) SlotState.Free else SlotState.Unavailable
+                        val fits = minutes >= durationMinutes
+                        val gapsAllowed = Duration.between(previousEnd, start).toMinutes().isAllowedGap() &&
+                            (minutes - durationMinutes).toLong().isAllowedGap()
+                        val state = if (fits && gapsAllowed) SlotState.Free else SlotState.Unavailable
                         Slot(start, time, state, maxMinutes = minutes)
                     }
                 }
@@ -128,6 +142,9 @@ object SlotCalculator {
                 endTime = booking.end.atZone(Syltek.ZONE).toLocalTime()
             )
         }
+
+    /** Sin hueco, o uno que se pueda reservar después. */
+    private fun Long.isAllowedGap(): Boolean = this == 0L || this >= Syltek.MIN_FREE_GAP_MINUTES
 
     private fun Period.starts(): List<LocalTime> = generateSequence(start) { it.plusMinutes(intervalMinutes.toLong()) }
         // Un inicio justo en el final del tramo no sirve. Un tramo que acaba a medianoche (00:00) llega hasta el

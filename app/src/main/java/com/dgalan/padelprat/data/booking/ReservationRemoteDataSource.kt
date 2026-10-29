@@ -17,7 +17,7 @@ import okhttp3.Response
 sealed interface ReservationStep<out T> {
     data class Ok<T>(val value: T) : ReservationStep<T>
 
-    /** El servidor ha redirigido a la parrilla: el hueco ya no es válido. */
+    /** El servidor ha redirigido a la parrilla sin dar motivo: el hueco ya no es válido o aún no se puede reservar. */
     data object SlotUnavailable : ReservationStep<Nothing>
 
     /** La web no deja reservar y explica por qué (p. ej. el límite de reservas del club). */
@@ -101,7 +101,7 @@ class ReservationRemoteDataSource @Inject constructor(private val client: OkHttp
                         ReservationStep.SessionExpired
 
                     response.isRedirect && location.contains(Syltek.TIMETABLE_PATH, ignoreCase = true) ->
-                        ReservationStep.SlotUnavailable
+                        refusal(location)
 
                     else -> handle(response)
                 }
@@ -109,6 +109,22 @@ class ReservationRemoteDataSource @Inject constructor(private val client: OkHttp
         } catch (_: IOException) {
             ReservationStep.NetworkError
         }
+    }
+
+    /**
+     * La parrilla a la que redirige un rechazo trae el motivo, si lo hay, en un aviso de un solo uso: se carga (solo
+     * lectura) para leerlo. Se llama desde [post], que ya corre en el hilo de red.
+     */
+    private fun refusal(location: String): ReservationStep<Nothing> {
+        val url = baseUrl.resolve(location) ?: return ReservationStep.SlotUnavailable
+        val message = try {
+            client.newCall(Request.Builder().url(url).get().build()).execute().use { response ->
+                if (response.isSuccessful) ReservationParsers.parseRefusal(response.body.string()) else null
+            }
+        } catch (_: IOException) {
+            null
+        }
+        return message?.let { ReservationStep.Rejected(it) } ?: ReservationStep.SlotUnavailable
     }
 
     /** Sin formulario, la página puede traer el motivo (p. ej. el límite de reservas): se devuelve tal cual. */

@@ -41,7 +41,9 @@ apertura, y **respeta el límite** de 2 reservas activas del club.
    **Reintentos de la pre-reserva:** la web responde igual (303 a la parrilla, sin mensaje) a un hueco ocupado y
    a uno que aún no deja reservar. El 29/10/2026 la primera parrilla salió a las 8:59:59,7 del club, las dos
    pre-reservas se rechazaron así y las pistas siguieron libres unos minutos (por los ids, las cogieron otros
-   socios hacia las 9:06). Por eso, si la web rechaza la pre-reserva sin motivo, se vuelve a leer la parrilla y
+   socios hacia las 9:06). Una de ellas (la 10) dejaba un hueco de 30 min, que la web no permite (ver
+   docs/syltek-api.md, apartado 4.6); ahora la parrilla ya no la da como libre y, si la web da un motivo, se lee
+   y no se reintenta. Por eso, si la web rechaza la pre-reserva sin motivo, se vuelve a leer la parrilla y
    se prueban otra vez todas las que sigan libres, por orden, durante 30 s desde que el día sale abierto: con
    250 ms de pausa los primeros 5 s y luego 1 s (unas 15–25 vueltas). Una pre-reserva rechazada no bloquea nada,
    así que reintentarla no puede duplicar la reserva; los demás pasos siguen sin reintentarse nunca.

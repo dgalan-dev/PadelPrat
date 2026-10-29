@@ -40,6 +40,12 @@ object Syltek {
     /** El club solo deja tener a la vez este número de reservas activas; al anular una se puede volver a reservar. */
     const val MAX_ACTIVE_RESERVATIONS = 2
 
+    /**
+     * Una reserva no puede dejar antes ni después un hueco libre más corto que esto, hasta otra reserva, la apertura o
+     * el cierre. La web lo rechaza con "No se pueden dejar espacios libres menores de 60 minutos" (29/10/2026).
+     */
+    const val MIN_FREE_GAP_MINUTES = 60L
+
     /** "Mi Cuenta": datos del usuario (solo lectura en la app). */
     const val ACCOUNT_PATH = "customerzone/account/"
 

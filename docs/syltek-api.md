@@ -186,6 +186,12 @@ También aparece `webservice:'/timetableService/timetable'`, pero el JS de la pa
 2. Descartar los inicios que caen dentro de una reserva de esa pista.
 3. Descartar los anteriores a `nowUtc` y los posteriores a `nowUtcMaxAvailability`.
 4. La duración máxima es el tiempo hasta la siguiente reserva o el cierre. La web ofrece 60 o 90 min.
+5. **Norma del club: no se pueden dejar huecos libres de menos de 60 minutos.** Un inicio solo vale si el hueco
+   desde la reserva anterior (o la apertura) y hasta la siguiente (o el cierre), contando la duración, es de 0 o
+   de 60 minutos o más. Si no, la pre-reserva se rechaza con "No hay disponibilidad para la instalación y horas
+   seleccionadas. No se pueden dejar espacios libres menores de 60 minutos." (comprobado el 29/10/2026: 20:30
+   tras una reserva que acababa a las 20:00, rechazada; 20:30 tras una que acababa a las 20:30, aceptada).
+   **Sin comprobar:** si cuentan los huecos que ya han pasado (hoy antes de la hora actual); la app los cuenta.
 
 Lista de espera (no probada): `GET /customerzone/waitinglist?date=2026-10-23&idresourcetype=56`.
 
@@ -224,7 +230,7 @@ idResource=1477&localDatetime=28%2F10%2F2026+10%3A30&fromWeekTimeTable=false&cal
 | Resultado | Respuesta |
 | --- | --- |
 | Hueco bloqueado | 200, página "Nueva Reserva" con "Tienes 8 minutos para validar la reserva" |
-| Hueco no válido | 303 a `/customerZone/timetable?encodedDate=…`, sin mensaje de error. También, probablemente, si aún no deja reservar ese día (29/10/2026, justo en la apertura): no se distinguen |
+| Hueco no válido | 303 a `/customerZone/timetable?encodedDate=…`. El motivo, si lo hay, sale en esa parrilla como aviso de un solo uso (`.clientNotification .message`, solo en la primera carga tras la redirección), p. ej. el de los huecos de menos de 60 min (apartado 4.6). La app la carga para leerlo. Sin aviso: probablemente ocupado o aún sin abrir (29/10/2026, justo en la apertura) |
 
 > **Esta llamada ya crea una reserva provisional.** No la lances para consultar precios ni
 > duraciones: bloquea la pista a otros socios hasta que caduca.

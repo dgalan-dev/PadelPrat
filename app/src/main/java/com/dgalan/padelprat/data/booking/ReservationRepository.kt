@@ -16,7 +16,8 @@ sealed interface ReservationResult {
 
     /**
      * La web rechazó la pre-reserva sin dar motivo: el hueco ya no está libre o todavía no se puede reservar (justo en
-     * la apertura). No ha quedado nada bloqueado, así que se puede volver a intentar.
+     * la apertura). No ha quedado nada bloqueado, así que se puede volver a intentar. Si da el motivo (p. ej. que
+     * dejaría un hueco de menos de 60 minutos), es [Rejected].
      */
     data object SlotRefused : ReservationResult
 
