@@ -224,7 +224,7 @@ idResource=1477&localDatetime=28%2F10%2F2026+10%3A30&fromWeekTimeTable=false&cal
 | Resultado | Respuesta |
 | --- | --- |
 | Hueco bloqueado | 200, página "Nueva Reserva" con "Tienes 8 minutos para validar la reserva" |
-| Hueco no válido | 303 a `/customerZone/timetable?encodedDate=…`, sin mensaje de error |
+| Hueco no válido | 303 a `/customerZone/timetable?encodedDate=…`, sin mensaje de error. También, probablemente, si aún no deja reservar ese día (29/10/2026, justo en la apertura): no se distinguen |
 
 > **Esta llamada ya crea una reserva provisional.** No la lances para consultar precios ni
 > duraciones: bloquea la pista a otros socios hasta que caduca.

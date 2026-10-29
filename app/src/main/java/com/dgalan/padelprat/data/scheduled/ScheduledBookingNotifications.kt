@@ -105,25 +105,40 @@ class ScheduledBookingNotifications @Inject constructor(@ApplicationContext priv
         manager.notify(booking.id.hashCode(), notification)
     }
 
-    /** Qué pasó con cada pista elegida, una por línea, y con las demás. */
+    /** Qué pasó con cada pista elegida, una por línea, y con las demás que llegaron a salir libres. */
     private fun noCourtDetails(result: ScheduledRunResult.NoCourtFree): String {
         val read = context.getString(R.string.notification_timetable_read, result.timetableReadAt.clubTime())
-        val courts = result.attempts.map { attempt ->
-            val name = attempt.court.name
-            val at = attempt.at?.clubTime().orEmpty()
-            when (val outcome = attempt.outcome) {
-                CourtOutcome.BusyAtOpening -> context.getString(R.string.notification_court_busy, name)
-
-                CourtOutcome.Taken -> context.getString(R.string.notification_court_taken, name, at)
-
-                is CourtOutcome.Rejected ->
-                    context.getString(R.string.notification_court_rejected, name, at, outcome.message)
-            }
+        val others = if (result.others.isEmpty()) {
+            listOf(context.getString(R.string.notification_others_none))
+        } else {
+            listOf(context.getString(R.string.notification_others_free)) + result.others.map(::courtLine)
         }
-        val others = context.getString(
-            if (result.othersFree) R.string.notification_others_lost else R.string.notification_others_none
-        )
-        return (listOf(read) + courts + others).joinToString("\n")
+        return (listOf(read) + result.chosen.map(::courtLine) + others).joinToString("\n")
+    }
+
+    private fun courtLine(attempt: CourtAttempt): String {
+        val name = attempt.court.name
+        val at = attempt.at?.clubTime().orEmpty()
+        val firstAt = attempt.firstAt?.clubTime().orEmpty()
+        val tries = attempt.tries
+        return when (val outcome = attempt.outcome) {
+            CourtOutcome.BusyAtOpening -> context.getString(R.string.notification_court_busy, name)
+
+            CourtOutcome.Taken ->
+                context.resources.getQuantityString(R.plurals.notification_court_taken, tries, name, at, tries)
+
+            CourtOutcome.Refused -> context.resources.getQuantityString(
+                R.plurals.notification_court_refused,
+                tries,
+                name,
+                at,
+                tries,
+                firstAt
+            )
+
+            is CourtOutcome.Rejected ->
+                context.getString(R.string.notification_court_rejected, name, at, outcome.message)
+        }
     }
 
     private fun Instant.clubTime(): String = atZone(Syltek.ZONE).format(CLUB_TIME)

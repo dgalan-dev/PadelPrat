@@ -310,7 +310,8 @@ class BookingViewModel @Inject constructor(
             ) {
                 is ReservationResult.Success -> ReservationStatus.Success(result.total)
 
-                ReservationResult.SlotUnavailable -> ReservationStatus.Failed(ReservationError.SlotUnavailable)
+                ReservationResult.SlotUnavailable, ReservationResult.SlotRefused ->
+                    ReservationStatus.Failed(ReservationError.SlotUnavailable)
 
                 ReservationResult.NetworkError -> ReservationStatus.Failed(ReservationError.Network)
 

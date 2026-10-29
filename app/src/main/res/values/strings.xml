@@ -92,11 +92,21 @@
     <string name="notification_timetable_read">Parrilla leída a las %1$s (hora del club).</string>
     <!-- Qué pasó con cada pista elegida: "Pista 2: ya estaba ocupada al abrir." -->
     <string name="notification_court_busy">%1$s: ya estaba ocupada al abrir.</string>
-    <!-- "Pista 5: otro socio la cogió antes (9:00:00,9)." -->
-    <string name="notification_court_taken">%1$s: otro socio la cogió antes (%2$s).</string>
+    <!-- "Pista 5: otro socio la cogió antes (9:00:00,9)." o, con varios intentos, "(3 intentos; el último a las 9:00:02,1)" -->
+    <plurals name="notification_court_taken">
+        <item quantity="one">%1$s: otro socio la cogió antes (%2$s).</item>
+        <item quantity="other">%1$s: otro socio la cogió antes (%3$d intentos; el último a las %2$s).</item>
+        <item quantity="many">%1$s: otro socio la cogió antes (%3$d intentos; el último a las %2$s).</item>
+    </plurals>
+    <!-- La web rechazó las pre-reservas sin motivo y la pista seguía libre: "…14 veces sin dar motivo (de 9:00:00,1 a 9:00:29,8)." -->
+    <plurals name="notification_court_refused">
+        <item quantity="one">%1$s: la web la rechazó sin dar motivo y seguía libre (%2$s).</item>
+        <item quantity="other">%1$s: la web la rechazó %3$d veces sin dar motivo y seguía libre (de %4$s a %2$s).</item>
+        <item quantity="many">%1$s: la web la rechazó %3$d veces sin dar motivo y seguía libre (de %4$s a %2$s).</item>
+    </plurals>
     <string name="notification_court_rejected">%1$s: la web no dejó reservarla (%2$s): «%3$s»</string>
     <string name="notification_others_none">Tampoco había otra pista libre a esa hora.</string>
-    <string name="notification_others_lost">Las demás pistas libres tampoco se pudieron reservar.</string>
+    <string name="notification_others_free">Otras pistas que salieron libres:</string>
     <string name="notification_result_booked_other">Ninguna de las pistas elegidas estaba libre.</string>
     <string name="notification_result_limit">Ya tenías el máximo de reservas del club para el %1$s a las %2$s. Anula una para poder reservar.</string>
     <string name="notification_result_logged_out">La sesión se había cerrado; no se ha podido reservar el %1$s a las %2$s. Vuelve a entrar en la app.</string>

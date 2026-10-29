@@ -14,6 +14,12 @@ sealed interface ReservationResult {
     /** El hueco ya no se puede reservar (lo ha cogido otro socio o ya no cabe la duración). */
     data object SlotUnavailable : ReservationResult
 
+    /**
+     * La web rechazó la pre-reserva sin dar motivo: el hueco ya no está libre o todavía no se puede reservar (justo en
+     * la apertura). No ha quedado nada bloqueado, así que se puede volver a intentar.
+     */
+    data object SlotRefused : ReservationResult
+
     /** La web no deja reservar y da el motivo (p. ej. el límite de reservas del club), que se muestra tal cual. */
     data class Rejected(val message: String) : ReservationResult
 
@@ -52,6 +58,7 @@ class ReservationRepository @Inject constructor(
     suspend fun book(courtId: Int, start: Instant, durationMinutes: Int): ReservationResult = mutex.withLock {
         var form = when (val step = remote.preReserve(courtId, start)) {
             is ReservationStep.Ok -> step.value
+            ReservationStep.SlotUnavailable -> return ReservationResult.SlotRefused
             else -> return step.toResult(confirming = false)
         }
 

@@ -38,14 +38,22 @@ apertura, y **respeta el límite** de 2 reservas activas del club.
    y luego la tercera; si no sale ninguna, cualquier otra pista libre a esa hora, en el orden de la parrilla
    (siempre, sin opción para desactivarlo). Nunca más de una reserva por programación. Tarda 1–2 s tras la
    apertura.
+   **Reintentos de la pre-reserva:** la web responde igual (303 a la parrilla, sin mensaje) a un hueco ocupado y
+   a uno que aún no deja reservar. El 29/10/2026 la primera parrilla salió a las 8:59:59,7 del club, las dos
+   pre-reservas se rechazaron así y las pistas siguieron libres unos minutos (por los ids, las cogieron otros
+   socios hacia las 9:06). Por eso, si la web rechaza la pre-reserva sin motivo, se vuelve a leer la parrilla y
+   se prueban otra vez todas las que sigan libres, por orden, durante 30 s desde que el día sale abierto: con
+   250 ms de pausa los primeros 5 s y luego 1 s (unas 15–25 vueltas). Una pre-reserva rechazada no bloquea nada,
+   así que reintentarla no puede duplicar la reserva; los demás pasos siguen sin reintentarse nunca.
    Si se corta al confirmar, se mira en Mis reservas (hasta 3 veces, cada 3 s) si sale hecha a esa hora, con esa
    duración y en esa pista: si sale, se avisa de que está reservada; si no, de que hay que comprobarlo. Solo
    cambia el aviso: nunca se prueba otra pista, porque el listado puede tardar en mostrar la reserva.
 6. **Avisar** con una notificación del resultado ("Reservada la Pista 2 el jueves 5 a las 18:30" o el motivo
    de que no se haya podido). Si no se consigue pista, el aviso desplegado dice qué pasó con cada pista elegida:
    ya ocupada en la primera parrilla tras la apertura, perdida al pre-reservar (otro socio se adelantó) o
-   rechazada por la web con su mensaje, con la hora del club (con décimas) a la que se leyó la parrilla y a la que
-   respondió cada pre-reserva; y si había alguna otra libre.
+   rechazada por la web con su mensaje, o rechazada sin motivo mientras seguía libre, con la hora del club (con
+   décimas) a la que se leyó la parrilla, el número de intentos y a qué hora respondió el primero y el último. Lo
+   mismo con cada una de las demás pistas que llegaron a salir libres.
 
 - Antes de intentarlo se comprueba el límite de 2 reservas activas; si ya hay 2, no se intenta y se avisa.
 - **Batería:** prácticamente nada. Hasta el día de apertura solo hay una alarma del sistema; ese día, uno o dos
