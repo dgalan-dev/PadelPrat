@@ -243,7 +243,8 @@ class ScheduledBookingRunner @Inject constructor(
             if (Instant.now() >= retryUntil) break
             delay((if (Instant.now() < fastRetryUntil) FAST_POLL_INTERVAL else POLL_INTERVAL).toMillis())
             timetable = when (val result = timetableRepository.timetable(targetDay)) {
-                is TimetableResult.Success -> result.timetable
+                // Una parrilla sin pistas no dice nada de las que había: se sigue con la última
+                is TimetableResult.Success -> result.timetable.takeIf { it.hasSchedule } ?: timetable
 
                 TimetableResult.SessionExpired -> return ScheduledRun(ScheduledRunResult.LoggedOut, warning)
 
@@ -331,10 +332,16 @@ class ScheduledBookingRunner @Inject constructor(
         while (Instant.now() < deadline) {
             // Un día aún cerrado responde sin parrilla (UnknownError); sin conexión también se sigue intentando. Con
             // la parrilla, el límite de reserva tiene que llegar a la hora pedida: si no, sus huecos se descartarían
-            // como no reservables y se daría el día por perdido justo al abrir
+            // como no reservables y se daría el día por perdido justo al abrir. Y tiene que traer las pistas: el día
+            // puede salir abierto unos minutos antes, pero sin ninguna, y se daría por perdido igual
             when (val result = timetableRepository.timetable(day)) {
-                is TimetableResult.Success -> if (result.timetable.maxAvailability >= start) return result.timetable
+                is TimetableResult.Success -> {
+                    val timetable = result.timetable
+                    if (timetable.maxAvailability >= start && timetable.hasSchedule) return timetable
+                }
+
                 TimetableResult.SessionExpired -> return null
+
                 else -> Unit
             }
             delay((if (Instant.now() < fastUntil) FAST_POLL_INTERVAL else POLL_INTERVAL).toMillis())

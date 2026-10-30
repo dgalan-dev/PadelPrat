@@ -15,7 +15,13 @@ data class DayTimetable(
     val maxAvailability: Instant,
     val courts: List<Court>,
     val bookings: List<Booking>
-)
+) {
+    /**
+     * Si alguna pista tiene horario. Antes de las 9:00 la web puede dar el día ya abierto, pero sin pistas ("No hay
+     * instalaciones configuradas con horario disponible").
+     */
+    val hasSchedule: Boolean get() = courts.any { it.periods.isNotEmpty() }
+}
 
 data class Court(
     val id: Int,

@@ -14,6 +14,12 @@ apertura, y **respeta el límite** de 2 reservas activas del club.
   14 minutos"*. Ese tiempo es lo que falta hasta `nowUtcMaxAvailability`, que es el cierre (23:00) del último
   día abierto; va bajando y salta unas 24 h cuando se abre el día siguiente.
 - El primer día cerrado se deduce de `nowUtcMaxAvailability`: es el día siguiente al de esa fecha.
+- El 30/10/2026, desde al menos las 8:52 y hasta las 9:00 (± unos segundos), el día ya salía abierto (con
+  parrilla), pero sin pistas: la web mostraba *"No hay instalaciones configuradas con horario disponible"*. Por
+  eso la reserva programada no da el día por abierto hasta que la parrilla trae alguna pista con horario
+  (`DayTimetable.hasSchedule`), y en los reintentos una parrilla sin pistas no cuenta. En Reservar, ese día se
+  enseña como cerrado (con el formulario de programar) hasta un minuto después de la apertura, y se vuelve a
+  mirar al elegirlo o refrescar; pasado ese minuto, un día sin pistas se enseña tal cual.
 
 ## Funcionamiento
 

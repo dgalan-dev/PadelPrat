@@ -25,6 +25,7 @@ import com.dgalan.padelprat.data.scheduled.ScheduledBooking
 import com.dgalan.padelprat.data.scheduled.ScheduledBookingRepository
 import com.dgalan.padelprat.data.scheduled.ScheduledCourt
 import dagger.hilt.android.lifecycle.HiltViewModel
+import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
@@ -148,6 +149,12 @@ class BookingViewModel @Inject constructor(
     private val timetables = mutableMapOf<LocalDate, DayTimetable>()
     private var loadJob: Job? = null
 
+    /**
+     * Día que la web ya da por abierto, pero aún sin pistas (pasa unos minutos antes de las 9:00): se trata como
+     * cerrado hasta que vuelve a mirarse y ya las trae.
+     */
+    private var notOpenYet: LocalDate? = null
+
     init {
         load(_uiState.value.selectedDay)
         viewModelScope.launch {
@@ -178,6 +185,7 @@ class BookingViewModel @Inject constructor(
     fun onDaySelect(day: LocalDate) {
         if (day == _uiState.value.selectedDay) return
         _uiState.update { it.copy(selectedDay = day) }
+        recheckIfNotOpenYet(day)
         showSelectedDay()
     }
 
@@ -280,9 +288,7 @@ class BookingViewModel @Inject constructor(
         _uiState.update { state ->
             if (state.selectedDay != day) return@update state
             val previous = (state.content as? BookingContent.Schedule)?.form
-            val opensAt = day.minusDays(Syltek.BOOKING_OPENS_DAYS_BEFORE).atTime(Syltek.BOOKING_OPENS_AT)
-                .atZone(Syltek.ZONE).toInstant()
-            val form = ScheduleForm.from(day, opensAt, template, state.dayPart, state.durationMinutes, previous)
+            val form = ScheduleForm.from(day, opensAt(day), template, state.dayPart, state.durationMinutes, previous)
             state.copy(content = BookingContent.Schedule(form))
         }
     }
@@ -362,7 +368,15 @@ class BookingViewModel @Inject constructor(
         val day = _uiState.value.selectedDay
         timetables.remove(day)
         timetables.remove(day.minusDays(Syltek.BOOKING_OPENS_DAYS_BEFORE))
+        recheckIfNotOpenYet(day)
         showSelectedDay()
+    }
+
+    /** Al elegir o refrescar el día que aún no traía pistas, se vuelve a pedir: puede que ya las traiga. */
+    private fun recheckIfNotOpenYet(day: LocalDate) {
+        if (day != notOpenYet) return
+        notOpenYet = null
+        _uiState.update { it.copy(lastOpenDay = day) }
     }
 
     fun onRetry() = showSelectedDay()
@@ -374,6 +388,13 @@ class BookingViewModel @Inject constructor(
         loadJob = viewModelScope.launch {
             when (val result = repository.timetable(day)) {
                 is TimetableResult.Success -> {
+                    if (showAs == day && isNotOpenYet(result.timetable)) {
+                        // No se guarda: al volver a elegirlo o refrescar se mira otra vez
+                        notOpenYet = day
+                        updateDays(result.timetable)
+                        showSelectedDay()
+                        return@launch
+                    }
                     timetables[day] = result.timetable
                     updateDays(result.timetable)
                     if (showAs == day) showTimetable(result.timetable) else showScheduleForm(showAs, result.timetable)
@@ -415,11 +436,25 @@ class BookingViewModel @Inject constructor(
     private fun updateDays(timetable: DayTimetable) {
         val today = timetable.now.atZone(Syltek.ZONE).toLocalDate()
         val lastOpenDay = timetable.maxAvailability.atZone(Syltek.ZONE).toLocalDate()
+            .let { if (it == notOpenYet) it.minusDays(1) else it }
         _uiState.update { it.copy(days = daysFrom(today), lastOpenDay = lastOpenDay) }
     }
 
     private companion object {
+        /**
+         * Cuánto después de la apertura un día sin pistas aún se toma por no abierto. Pasado ese tiempo, es que ese
+         * día el club no tiene ninguna pista y se enseña tal cual.
+         */
+        val NOT_OPEN_GRACE: Duration = Duration.ofMinutes(1)
+
         fun daysFrom(today: LocalDate): List<LocalDate> = (0..MAX_SCHEDULE_DAYS_AHEAD).map(today::plusDays)
+
+        fun opensAt(day: LocalDate): Instant = day.minusDays(Syltek.BOOKING_OPENS_DAYS_BEFORE)
+            .atTime(Syltek.BOOKING_OPENS_AT).atZone(Syltek.ZONE).toInstant()
+
+        /** La parrilla viene sin pistas y aún no ha pasado (casi) la hora de apertura del día. */
+        fun isNotOpenYet(timetable: DayTimetable): Boolean =
+            !timetable.hasSchedule && timetable.now < opensAt(timetable.date).plus(NOT_OPEN_GRACE)
 
         /**
          * Siempre se abre en la tarde, que es cuando más se juega. Hasta la primera respuesta del servidor, el último
