@@ -407,11 +407,15 @@ private fun InfoRow(icon: Int, label: String, value: String) {
 
 @Composable
 private fun ProfileError(error: ProfileError, onRetry: () -> Unit) {
-    val network = error == ProfileError.Network
+    val (title, text) = when (error) {
+        ProfileError.Network -> R.string.error_network_title to R.string.error_network_text
+        ProfileError.Unknown -> R.string.profile_error_unknown to R.string.error_unknown_text
+        ProfileError.WebChanged -> R.string.error_web_changed_title to R.string.error_web_changed_text
+    }
     MessageState(
         icon = R.drawable.ic_error,
-        title = stringResource(if (network) R.string.error_network_title else R.string.profile_error_unknown),
-        message = stringResource(if (network) R.string.error_network_text else R.string.error_unknown_text),
+        title = stringResource(title),
+        message = stringResource(text),
         action = { Button(onClick = onRetry) { Text(stringResource(R.string.booking_retry)) } }
     )
 }

@@ -3,7 +3,6 @@ package com.dgalan.padelprat.feature.booking
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dgalan.padelprat.core.network.Syltek
-import com.dgalan.padelprat.data.booking.BOOKING_DURATIONS
 import com.dgalan.padelprat.data.booking.Court
 import com.dgalan.padelprat.data.booking.CourtSlots
 import com.dgalan.padelprat.data.booking.DayPart
@@ -38,7 +37,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-enum class BookingError { Network, Unknown }
+enum class BookingError { Network, Unknown, WebChanged }
 
 sealed interface BookingContent {
     data object Loading : BookingContent
@@ -403,6 +402,8 @@ class BookingViewModel @Inject constructor(
                 TimetableResult.NetworkError -> showError(BookingError.Network)
 
                 TimetableResult.UnknownError -> showError(BookingError.Unknown)
+
+                TimetableResult.FormatChanged -> showError(BookingError.WebChanged)
 
                 // La app ya está volviendo al login
                 TimetableResult.SessionExpired -> Unit

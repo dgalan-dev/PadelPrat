@@ -22,6 +22,9 @@ sealed interface ProfileResult {
     data object SessionExpired : ProfileResult
 
     data object UnknownError : ProfileResult
+
+    /** La web del club ha cambiado y la app no la entiende. */
+    data object FormatChanged : ProfileResult
 }
 
 /**
@@ -46,7 +49,7 @@ class ProfileRepository @Inject constructor(private val client: OkHttpClient, pr
                     !response.isSuccessful -> ProfileResult.UnknownError
 
                     else -> ProfileParser.parse(response.body.string())?.let(ProfileResult::Success)
-                        ?: ProfileResult.UnknownError
+                        ?: ProfileResult.FormatChanged
                 }
             }
         } catch (_: IOException) {

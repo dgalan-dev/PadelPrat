@@ -20,6 +20,9 @@ sealed interface ReservationsStep<out T> {
     data object NetworkError : ReservationsStep<Nothing>
 
     data object UnknownError : ReservationsStep<Nothing>
+
+    /** La página ha llegado bien pero no se entiende: la web del club ha cambiado. */
+    data object FormatChanged : ReservationsStep<Nothing>
 }
 
 /** Peticiones de Mis reservas (ver docs/syltek-api.md, apartado 6). */
@@ -28,7 +31,7 @@ class ReservationsRemoteDataSource @Inject constructor(private val client: OkHtt
     suspend fun list(): ReservationsStep<List<Reservation>> = get(Syltek.RESERVATIONS_PATH) { response ->
         if (!response.isSuccessful) return@get ReservationsStep.UnknownError
         ReservationsParser.parseList(response.body.string())?.let { ReservationsStep.Ok(it) }
-            ?: ReservationsStep.UnknownError
+            ?: ReservationsStep.FormatChanged
     }
 
     /** Pista de una reserva; `null` si no se ha podido leer (la tarjeta se muestra igualmente, sin pista). */

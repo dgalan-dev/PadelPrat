@@ -20,8 +20,14 @@ sealed interface TimetableResult {
 
     data object NetworkError : TimetableResult
 
-    /** La página no trae la parrilla o ha cambiado de formato. */
+    /** El servidor ha respondido con un error. */
     data object UnknownError : TimetableResult
+
+    /**
+     * La página no trae la parrilla o ha cambiado de formato. Un día aún cerrado también responde así (ver
+     * [com.dgalan.padelprat.data.scheduled.ScheduledBookingRunner]).
+     */
+    data object FormatChanged : TimetableResult
 }
 
 /** Parrilla de un día (ver docs/syltek-api.md, apartado 4.1). Requiere sesión. */
@@ -51,7 +57,7 @@ class TimetableRemoteDataSource @Inject constructor(private val client: OkHttpCl
                         // El análisis del HTML se hace fuera del hilo de red
                         withContext(Dispatchers.Default) { TimetableParser.parse(html, date) }
                             ?.let(TimetableResult::Success)
-                            ?: TimetableResult.UnknownError
+                            ?: TimetableResult.FormatChanged
                     }
                 }
             }

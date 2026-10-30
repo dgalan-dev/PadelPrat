@@ -6,6 +6,7 @@ import com.dgalan.padelprat.core.network.Syltek
 import com.dgalan.padelprat.data.friends.FriendAuthRepository
 import com.dgalan.padelprat.data.profile.ProfileRepository
 import com.dgalan.padelprat.data.reminders.ReminderRepository
+import com.dgalan.padelprat.data.reservations.ReservationsCache
 import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -25,6 +26,7 @@ class AuthRepository @Inject constructor(
     private val sessionExpiredNotifier: SessionExpiredNotifier,
     private val profileRepository: ProfileRepository,
     private val reminderRepository: ReminderRepository,
+    private val reservationsCache: ReservationsCache,
     private val friendAuthRepository: FriendAuthRepository
 ) {
 
@@ -51,7 +53,11 @@ class AuthRepository @Inject constructor(
 
     suspend fun login(email: String, password: String): LoginResult {
         val result = remote.login(email.trim(), password)
-        if (result == LoginResult.Success) sessionExpiredNotifier.reset()
+        if (result == LoginResult.Success) {
+            sessionExpiredNotifier.reset()
+            // Si la sesión caducó sin cerrarla, quien entra puede ser otro usuario
+            reservationsCache.clear()
+        }
         return result
     }
 
@@ -66,6 +72,7 @@ class AuthRepository @Inject constructor(
         sessionExpiredNotifier.reset()
         profileRepository.clear()
         reminderRepository.clear()
+        reservationsCache.clear()
         // Las reservas compartidas van con este usuario: el siguiente tendría que activarlas con su cuenta
         friendAuthRepository.signOut()
     }

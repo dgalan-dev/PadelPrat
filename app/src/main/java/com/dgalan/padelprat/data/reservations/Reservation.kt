@@ -1,14 +1,17 @@
 package com.dgalan.padelprat.data.reservations
 
+import com.dgalan.padelprat.data.scheduled.LocalDateTimeSerializer
 import java.time.LocalDateTime
+import kotlinx.serialization.Serializable
 
 enum class ReservationStatus { Booked, Cancelled, Unknown }
 
 /** Una reserva del usuario tal como la da la web (ver docs/syltek-api.md, apartado 6). Horas locales del club. */
+@Serializable
 data class Reservation(
     val id: Long,
     val status: ReservationStatus,
-    val start: LocalDateTime,
+    @Serializable(with = LocalDateTimeSerializer::class) val start: LocalDateTime,
     val durationMinutes: Int,
     /** Importe tal como lo muestra la web ("0,00 €"). */
     val total: String?,
@@ -23,4 +26,5 @@ data class Reservation(
 }
 
 /** "Pista 2: San Miguel Magna" → nombre "Pista 2" y patrocinador "San Miguel Magna". */
+@Serializable
 data class ReservationCourt(val name: String, val sponsor: String?)

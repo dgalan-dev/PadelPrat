@@ -48,6 +48,8 @@
     <string name="error_network_title">Sin conexión</string>
     <string name="error_network_text">Revisa tu internet y vuelve a intentarlo.</string>
     <string name="error_unknown_text">Vuelve a intentarlo más tarde.</string>
+    <string name="error_web_changed_title">La web del club ha cambiado</string>
+    <string name="error_web_changed_text">La app no puede leerla hasta que salga una actualización que lo arregle.</string>
     <string name="booking_retry">Reintentar</string>
     <string name="schedule_day_locked">Todavía no se puede reservar; se puede programar</string>
     <!-- "Este día todavía no se puede reservar. Se abre el sábado 24 a las 9:00." -->
@@ -205,6 +207,8 @@
     <string name="reservations_empty_past">No tienes reservas en los últimos 6 meses</string>
     <string name="reservations_empty_cancelled">No tienes reservas anuladas</string>
     <string name="reservations_error_unknown">No se han podido cargar tus reservas</string>
+    <!-- Sin conexión, sobre la copia guardada: "Sin conexión. Son tus reservas de hace 2 h." -->
+    <string name="reservations_offline">Sin conexión. Son tus reservas de %1$s.</string>
     <!-- Reservas compartidas con el amigo: de quién es cada tarjeta -->
     <string name="reservations_owner_me">Tú</string>
     <string name="reservations_owner_me_avatar">Yo</string>

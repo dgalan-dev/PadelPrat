@@ -32,13 +32,16 @@ object ReservationsParser {
     /**
      * Devuelve `null` si la página no tiene el formato esperado. El primer bloque de la página son las próximas
      * (incluidas las anuladas) y el segundo, el histórico.
+     *
+     * Si alguna tarjeta no se puede leer, falla el listado entero: uno incompleto quitaría los avisos de la reserva que
+     * falta y le diría al amigo que se ha anulado.
      */
     fun parseList(html: String): List<Reservation>? {
         val document = Jsoup.parse(html)
         val blocks = document.select("div.c-page-reservations")
         if (blocks.isEmpty() && document.selectFirst("h1.c-page-title__text") == null) return null
         return blocks.flatMapIndexed { index, block ->
-            block.select(".c-card--game").mapNotNull { card -> parseCard(card, upcoming = index == 0) }
+            block.select(".c-card--game").map { card -> parseCard(card, upcoming = index == 0) ?: return null }
         }
     }
 

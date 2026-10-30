@@ -166,21 +166,29 @@ private fun ReservationsContent(
                 FriendFilter(friend = friend, selected = uiState.ownerFilter, onSelect = onOwnerFilterSelect)
                 Spacer(Modifier.height(12.dp))
             }
+            (uiState.content as? ReservationsContent.Loaded)?.savedAt?.let { savedAt ->
+                OfflineNotice(savedAt)
+                Spacer(Modifier.height(12.dp))
+            }
             // Nunca se queda "refrescando": al soltar se recarga y lo que se ve son las siluetas de carga
             PullToRefreshBox(isRefreshing = false, onRefresh = onRefresh, modifier = Modifier.fillMaxSize()) {
                 when (val content = uiState.content) {
                     ReservationsContent.Loading -> SkeletonList()
 
                     is ReservationsContent.Error -> {
-                        val network = content.error == ReservationsError.Network
+                        val (title, text) = when (content.error) {
+                            ReservationsError.Network -> R.string.error_network_title to R.string.error_network_text
+
+                            ReservationsError.Unknown ->
+                                R.string.reservations_error_unknown to R.string.error_unknown_text
+
+                            ReservationsError.WebChanged ->
+                                R.string.error_web_changed_title to R.string.error_web_changed_text
+                        }
                         ScrollableMessage(
                             icon = R.drawable.ic_error,
-                            title = stringResource(
-                                if (network) R.string.error_network_title else R.string.reservations_error_unknown
-                            ),
-                            message = stringResource(
-                                if (network) R.string.error_network_text else R.string.error_unknown_text
-                            ),
+                            title = stringResource(title),
+                            message = stringResource(text),
                             action = { Button(onClick = onRetry) { Text(stringResource(R.string.booking_retry)) } }
                         )
                     }
@@ -431,6 +439,21 @@ private fun FriendFilter(friend: FriendReservations, selected: OwnerFilter, onSe
             )
         }
     }
+}
+
+/** Sobre la copia guardada de las reservas, cuando no hay conexión. */
+@Composable
+private fun OfflineNotice(savedAt: Instant) {
+    Text(
+        text = stringResource(R.string.reservations_offline, savedAt.updatedAgo()),
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSecondaryContainer,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .background(MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.shapes.medium)
+            .padding(horizontal = 14.dp, vertical = 10.dp)
+    )
 }
 
 /** "ahora mismo", "hace 5 min", "hace 3 h" o "hace 2 días". */

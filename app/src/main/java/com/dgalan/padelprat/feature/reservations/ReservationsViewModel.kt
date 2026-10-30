@@ -2,6 +2,7 @@ package com.dgalan.padelprat.feature.reservations
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.dgalan.padelprat.core.network.Syltek
 import com.dgalan.padelprat.data.friends.FriendReservations
 import com.dgalan.padelprat.data.friends.SharedReservationsRepository
 import com.dgalan.padelprat.data.reservations.CancelResult
@@ -15,6 +16,7 @@ import com.dgalan.padelprat.data.scheduled.ScheduledBookingAlarms
 import com.dgalan.padelprat.data.scheduled.ScheduledBookingRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.time.Instant
+import java.time.LocalDateTime
 import javax.inject.Inject
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,7 +27,7 @@ import kotlinx.coroutines.launch
 
 enum class ReservationsTab { Upcoming, Past, Cancelled }
 
-enum class ReservationsError { Network, Unknown }
+enum class ReservationsError { Network, Unknown, WebChanged }
 
 /** Qué reservas se ven en Próximas cuando hay reservas compartidas con el amigo. */
 enum class OwnerFilter { All, Mine, Friend }
@@ -35,9 +37,16 @@ sealed interface ReservationsContent {
 
     data class Error(val error: ReservationsError) : ReservationsContent
 
-    /** Las reservas repartidas en los tres apartados, ya ordenadas. */
-    data class Loaded(val upcoming: List<Reservation>, val past: List<Reservation>, val cancelled: List<Reservation>) :
-        ReservationsContent
+    /**
+     * Las reservas repartidas en los tres apartados, ya ordenadas. Con [savedAt], son la copia guardada (sin
+     * conexión) de esa hora, y no se pueden anular.
+     */
+    data class Loaded(
+        val upcoming: List<Reservation>,
+        val past: List<Reservation>,
+        val cancelled: List<Reservation>,
+        val savedAt: Instant? = null
+    ) : ReservationsContent
 }
 
 /** Resultado de anular o de cancelar una programación, que se muestra en un aviso. */
@@ -182,9 +191,15 @@ class ReservationsViewModel @Inject constructor(
             val content = when (val result = repository.reservations()) {
                 is ReservationsResult.Success -> result.reservations.toContent()
 
-                ReservationsResult.NetworkError -> ReservationsContent.Error(ReservationsError.Network)
+                is ReservationsResult.NetworkError ->
+                    result.cached?.let { cached ->
+                        cached.reservations.map { it.copy(canCancel = false) }.toContent()
+                            .copy(savedAt = cached.savedAt)
+                    } ?: ReservationsContent.Error(ReservationsError.Network)
 
                 ReservationsResult.UnknownError -> ReservationsContent.Error(ReservationsError.Unknown)
+
+                ReservationsResult.FormatChanged -> ReservationsContent.Error(ReservationsError.WebChanged)
 
                 // La app ya está volviendo al login
                 ReservationsResult.SessionExpired -> return@launch
@@ -196,13 +211,15 @@ class ReservationsViewModel @Inject constructor(
     /**
      * Próximas: del bloque de próximas de la web, de la más cercana a la más lejana. Pasadas: del histórico, de la más
      * reciente a la más antigua. Anuladas: todas las anuladas, de cualquiera de los dos bloques, también de la más
-     * reciente a la más antigua.
+     * reciente a la más antigua. Las próximas que ya han terminado (en una copia antigua) van a Pasadas.
      */
     private fun List<Reservation>.toContent(): ReservationsContent.Loaded {
+        val now = LocalDateTime.now(Syltek.ZONE)
         val (cancelled, active) = partition { it.status == ReservationStatus.Cancelled }
+        val (upcoming, past) = active.partition { it.upcoming && it.end > now }
         return ReservationsContent.Loaded(
-            upcoming = active.filter { it.upcoming }.sortedBy { it.start },
-            past = active.filterNot { it.upcoming }.sortedByDescending { it.start },
+            upcoming = upcoming.sortedBy { it.start },
+            past = past.sortedByDescending { it.start },
             cancelled = cancelled.sortedByDescending { it.start }
         )
     }

@@ -385,6 +385,10 @@ Cada reserva es una tarjeta `.c-card--game`:
 - Nombres de jugadores: solo en un comentario HTML dentro de `.playerslayout` (`<!--<span>Nombre</span>-->`).
 - La fecha va en texto largo y en el idioma de la sesión. Mejor tomarla del detalle o cruzar el id
   con la parrilla.
+- Si una sola tarjeta no se puede leer (falta el id, la fecha o la hora), la app descarta el listado
+  entero y lo trata como un cambio de la web. Un listado incompleto quitaría los avisos de la reserva
+  que falta y le avisaría al amigo de una anulación que no ha pasado. Un estado desconocido sí se
+  acepta (`ReservationStatus.Unknown`).
 
 ### 6.2 Detalle
 

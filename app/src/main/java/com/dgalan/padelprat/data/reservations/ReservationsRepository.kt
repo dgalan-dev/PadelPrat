@@ -18,12 +18,16 @@ import kotlinx.coroutines.sync.withLock
 sealed interface ReservationsResult {
     data class Success(val reservations: List<Reservation>) : ReservationsResult
 
-    data object NetworkError : ReservationsResult
+    /** [cached] es el último listado que se leyó, si lo hay, para enseñarlo sin conexión. */
+    data class NetworkError(val cached: CachedReservations?) : ReservationsResult
 
     /** La app ya está volviendo al login. */
     data object SessionExpired : ReservationsResult
 
     data object UnknownError : ReservationsResult
+
+    /** La web del club ha cambiado y la app no la entiende. */
+    data object FormatChanged : ReservationsResult
 }
 
 sealed interface CancelResult {
@@ -56,6 +60,7 @@ sealed interface ReservationCheck {
 class ReservationsRepository @Inject constructor(
     private val remote: ReservationsRemoteDataSource,
     private val changeNotifier: ReservationsChangeNotifier,
+    private val cache: ReservationsCache,
     private val reminders: ReminderRepository,
     private val sharedReservations: SharedReservationsRepository
 ) {
@@ -96,20 +101,23 @@ class ReservationsRepository @Inject constructor(
     /**
      * Todas las reservas del listado. A las próximas activas se les añade la pista, que solo viene en su detalle
      * (una petición por reserva: suelen ser pocas). Las pasadas y anuladas se dejan sin pista para no lanzar decenas
-     * de peticiones.
+     * de peticiones. Se guarda una copia para enseñarla sin conexión.
      */
     suspend fun reservations(): ReservationsResult = when (val step = list(publish = false)) {
         is ReservationsStep.Ok -> {
             val reservations = withCourts(step.value)
             sharedReservations.publish(reservations)
+            cache.save(reservations)
             ReservationsResult.Success(reservations)
         }
 
-        ReservationsStep.NetworkError -> ReservationsResult.NetworkError
+        ReservationsStep.NetworkError -> ReservationsResult.NetworkError(cache.read())
 
         ReservationsStep.SessionExpired -> ReservationsResult.SessionExpired
 
         ReservationsStep.UnknownError -> ReservationsResult.UnknownError
+
+        ReservationsStep.FormatChanged -> ReservationsResult.FormatChanged
     }
 
     private suspend fun withCourts(reservations: List<Reservation>): List<Reservation> = coroutineScope {

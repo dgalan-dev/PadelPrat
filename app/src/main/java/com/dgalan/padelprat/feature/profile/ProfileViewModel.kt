@@ -21,7 +21,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-enum class ProfileError { Network, Unknown }
+enum class ProfileError { Network, Unknown, WebChanged }
 
 /** Reservas compartidas con el amigo (ver docs/plan-reservas-amigo.md). */
 sealed interface SharingState {
@@ -162,6 +162,7 @@ class ProfileViewModel @Inject constructor(
                 is ProfileResult.Success, ProfileResult.SessionExpired -> null
                 ProfileResult.NetworkError -> ProfileError.Network
                 ProfileResult.UnknownError -> ProfileError.Unknown
+                ProfileResult.FormatChanged -> ProfileError.WebChanged
             }
             _uiState.update { it.copy(isLoading = false, error = error) }
         }

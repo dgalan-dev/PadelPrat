@@ -1065,11 +1065,15 @@ private fun EmptyState(dayPart: DayPart, durationMinutes: Int) {
 
 @Composable
 private fun ErrorState(error: BookingError, onRetry: () -> Unit) {
-    val network = error == BookingError.Network
+    val (title, text) = when (error) {
+        BookingError.Network -> R.string.error_network_title to R.string.error_network_text
+        BookingError.Unknown -> R.string.booking_error_unknown to R.string.error_unknown_text
+        BookingError.WebChanged -> R.string.error_web_changed_title to R.string.error_web_changed_text
+    }
     MessageState(
         icon = R.drawable.ic_error,
-        title = stringResource(if (network) R.string.error_network_title else R.string.booking_error_unknown),
-        message = stringResource(if (network) R.string.error_network_text else R.string.error_unknown_text),
+        title = stringResource(title),
+        message = stringResource(text),
         action = {
             Button(onClick = onRetry) { Text(stringResource(R.string.booking_retry)) }
         }

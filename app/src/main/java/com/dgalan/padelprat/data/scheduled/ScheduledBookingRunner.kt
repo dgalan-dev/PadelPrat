@@ -330,7 +330,7 @@ class ScheduledBookingRunner @Inject constructor(
     private suspend fun waitUntilOpen(day: LocalDate, start: Instant, fastUntil: Instant): DayTimetable? {
         val deadline = Instant.now().plus(OPEN_TIMEOUT)
         while (Instant.now() < deadline) {
-            // Un día aún cerrado responde sin parrilla (UnknownError); sin conexión también se sigue intentando. Con
+            // Un día aún cerrado responde sin parrilla (FormatChanged); sin conexión también se sigue intentando. Con
             // la parrilla, el límite de reserva tiene que llegar a la hora pedida: si no, sus huecos se descartarían
             // como no reservables y se daría el día por perdido justo al abrir. Y tiene que traer las pistas: el día
             // puede salir abierto unos minutos antes, pero sin ninguna, y se daría por perdido igual
