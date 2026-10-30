@@ -22,11 +22,16 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v6
 
+      # Antes de compilar: que el tag sea la versión de la app y que estén escritas sus notas
       - name: Check version
         run: |
           version=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
           if [ "v$version" != "$GITHUB_REF_NAME" ]; then
             echo "::error::El tag $GITHUB_REF_NAME no coincide con versionName ($version)"
+            exit 1
+          fi
+          if [ ! -s "docs/releases/$version.md" ]; then
+            echo "::error::Faltan las notas de la versión en docs/releases/$version.md"
             exit 1
           fi
 
@@ -59,7 +64,8 @@ jobs:
         run: |
           apk="PadelPrat-${GITHUB_REF_NAME#v}.apk"
           cp app/build/outputs/apk/release/app-release.apk "$apk"
-          gh release create "$GITHUB_REF_NAME" "$apk" --title "PadelPrat ${GITHUB_REF_NAME#v}" --generate-notes
+          gh release create "$GITHUB_REF_NAME" "$apk" --title "PadelPrat ${GITHUB_REF_NAME#v}" \
+            --notes-file "docs/releases/${GITHUB_REF_NAME#v}.md"
         env:
           GH_TOKEN: ${{ github.token }}
 

@@ -13,7 +13,9 @@ El CI (`.github/workflows/ci.yml`) ejecuta lo mismo en cada push a `main` y en c
 
 ### Releases
 
-Se publican en GitHub Releases (no en Google Play). Para sacar una versión: subir `versionCode` y `versionName` en `app/build.gradle.kts`, commitear y subir un tag `vX.Y.Z` igual a `versionName`. El workflow `.github/workflows/release.yml` comprueba que coinciden, compila la release firmada y la publica con el APK (`PadelPrat-X.Y.Z.apk`).
+Se publican en GitHub Releases (no en Google Play). Para sacar una versión: subir `versionCode` y `versionName` en `app/build.gradle.kts`, escribir sus notas en `docs/releases/X.Y.Z.md`, commitear y subir un tag `vX.Y.Z` igual a `versionName`. El workflow `.github/workflows/release.yml` comprueba que coinciden y que existen las notas, compila la release firmada y la publica con el APK (`PadelPrat-X.Y.Z.apk`) y esas notas como descripción.
+
+- Notas de la versión: las escribe Claude en el mismo commit que la subida de versión ("Prepare the X.Y.Z release"), con el formato de las anteriores (ver la última en `docs/releases/`): una frase de resumen, el aviso de app no oficial, `## Cambios` con un `###` por área, `## Instalación` y la versión mínima de Android. En español, para el usuario de la app (qué cambia al usarla, no cómo está hecho), con todos los cambios desde la versión anterior (`git log vANTERIOR..HEAD`). El repositorio es público: sin nombres de personas ni detalles internos (Firebase, claves, consola).
 
 - La clave de firma (`padelprat-release.jks`, alias `padelprat`) **no está en el repositorio**: está en los secretos de GitHub `RELEASE_KEYSTORE_BASE64` y `RELEASE_KEYSTORE_PASSWORD`, y en una copia del usuario fuera del proyecto. Si se pierde, las nuevas versiones no se pueden instalar encima de las anteriores.
 - **Cada release es una actualización obligatoria**: al abrir, la app consulta la última release de GitHub y, si es más nueva, bloquea todo con `ForceUpdateScreen` hasta instalarla (ver "Actualización obligatoria" en Arquitectura). Una release rota obliga a todos a instalarla, y solo se arregla publicando otra más nueva. El asset tiene que seguir siendo un `.apk`.
