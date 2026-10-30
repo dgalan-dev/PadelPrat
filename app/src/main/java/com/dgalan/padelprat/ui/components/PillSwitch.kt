@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -54,6 +55,12 @@ fun <T> PillSwitch(
             .padding(3.dp)
     ) {
         val optionWidth = maxWidth / options.size
+        // Si no cabe en una línea (p. ej. "Programadas" con 4 opciones a 360 dp), la letra se reduce hasta labelSmall
+        val typography = MaterialTheme.typography
+        val autoSize = TextAutoSize.StepBased(
+            minFontSize = typography.labelSmall.fontSize,
+            maxFontSize = typography.labelLarge.fontSize
+        )
         val indicatorOffset by animateDpAsState(
             targetValue = optionWidth * options.indexOf(selected).coerceAtLeast(0),
             animationSpec = spring(dampingRatio = 0.8f, stiffness = 500f),
@@ -91,9 +98,13 @@ fun <T> PillSwitch(
                     } else {
                         Text(
                             text = label(option),
-                            style = MaterialTheme.typography.labelLarge,
+                            style = typography.labelLarge,
                             color = textColor,
-                            textAlign = TextAlign.Center
+                            textAlign = TextAlign.Center,
+                            maxLines = 1,
+                            softWrap = false,
+                            autoSize = autoSize,
+                            modifier = Modifier.padding(horizontal = 6.dp)
                         )
                     }
                 }
@@ -112,6 +123,21 @@ private fun PillSwitchPreview() {
             onSelect = {},
             label = { it },
             modifier = Modifier.padding(16.dp)
+        )
+    }
+}
+
+/** El caso más justo: las 4 pestañas de Mis reservas en un móvil estrecho. */
+@Preview(showBackground = true, widthDp = 360)
+@Composable
+private fun PillSwitchFourOptionsPreview() {
+    PadelPratTheme {
+        PillSwitch(
+            options = listOf("Próximas", "Programadas", "Pasadas", "Anuladas"),
+            selected = "Programadas",
+            onSelect = {},
+            label = { it },
+            modifier = Modifier.fillMaxWidth().padding(16.dp)
         )
     }
 }

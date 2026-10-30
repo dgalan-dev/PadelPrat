@@ -25,7 +25,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-enum class ReservationsTab { Upcoming, Past, Cancelled }
+enum class ReservationsTab { Upcoming, Scheduled, Past, Cancelled }
 
 enum class ReservationsError { Network, Unknown, WebChanged }
 
@@ -62,7 +62,7 @@ data class ReservationsUiState(
     val content: ReservationsContent = ReservationsContent.Loading,
     val cancelDialog: CancelDialog? = null,
     val message: CancelMessage? = null,
-    /** Reservas programadas que aún no se han intentado; se muestran arriba de las próximas. */
+    /** Reservas programadas que aún no se han intentado, en su propia pestaña. */
     val scheduled: List<ScheduledBooking> = emptyList(),
     /** Las próximas del amigo; `null` si las reservas compartidas no están activadas (o no se han podido leer). */
     val friend: FriendReservations? = null,
@@ -90,7 +90,16 @@ class ReservationsViewModel @Inject constructor(
         // Al reservar desde la parrilla o al anular aquí, se recarga solo
         viewModelScope.launch { changeNotifier.changes.collect { load() } }
         viewModelScope.launch {
-            scheduledRepository.scheduled.collect { scheduled -> _uiState.update { it.copy(scheduled = scheduled) } }
+            var knownIds: Set<String>? = null
+            scheduledRepository.scheduled.collect { scheduled ->
+                val ids = scheduled.map { it.id }.toSet()
+                // Al programar una nueva en la parrilla, su "Ver reservas" tiene que llevar a donde está
+                val added = knownIds?.let { known -> (ids - known).isNotEmpty() } ?: false
+                knownIds = ids
+                _uiState.update {
+                    it.copy(scheduled = scheduled, tab = if (added) ReservationsTab.Scheduled else it.tab)
+                }
+            }
         }
     }
 

@@ -64,6 +64,7 @@ import com.dgalan.padelprat.data.reservations.Reservation
 import com.dgalan.padelprat.data.reservations.ReservationCourt
 import com.dgalan.padelprat.data.reservations.ReservationStatus
 import com.dgalan.padelprat.data.scheduled.ScheduledBooking
+import com.dgalan.padelprat.data.scheduled.ScheduledCourt
 import com.dgalan.padelprat.ui.components.CourtName
 import com.dgalan.padelprat.ui.components.MessageState
 import com.dgalan.padelprat.ui.components.PadelCard
@@ -82,6 +83,7 @@ import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.LocalTime
 
 /** [onBookClick] lleva a la pestaña Reservar (desde la lista vacía). */
 @Composable
@@ -166,16 +168,27 @@ private fun ReservationsContent(
                 FriendFilter(friend = friend, selected = uiState.ownerFilter, onSelect = onOwnerFilterSelect)
                 Spacer(Modifier.height(12.dp))
             }
-            (uiState.content as? ReservationsContent.Loaded)?.savedAt?.let { savedAt ->
+            val savedAt = (uiState.content as? ReservationsContent.Loaded)?.savedAt
+            if (savedAt != null && uiState.tab != ReservationsTab.Scheduled) {
                 OfflineNotice(savedAt)
                 Spacer(Modifier.height(12.dp))
             }
             // Nunca se queda "refrescando": al soltar se recarga y lo que se ve son las siluetas de carga
             PullToRefreshBox(isRefreshing = false, onRefresh = onRefresh, modifier = Modifier.fillMaxSize()) {
-                when (val content = uiState.content) {
-                    ReservationsContent.Loading -> SkeletonList()
+                val content = uiState.content
+                when {
+                    // Las programadas están en el móvil: no esperan a que se lea la web
+                    uiState.tab == ReservationsTab.Scheduled ->
+                        ScheduledList(
+                            scheduled = uiState.scheduled,
+                            onScheduleCancel = onScheduleCancel,
+                            onScheduleTest = onScheduleTest,
+                            onBookClick = onBookClick
+                        )
 
-                    is ReservationsContent.Error -> {
+                    content == ReservationsContent.Loading -> SkeletonList()
+
+                    content is ReservationsContent.Error -> {
                         val (title, text) = when (content.error) {
                             ReservationsError.Network -> R.string.error_network_title to R.string.error_network_text
 
@@ -193,16 +206,13 @@ private fun ReservationsContent(
                         )
                     }
 
-                    is ReservationsContent.Loaded ->
+                    content is ReservationsContent.Loaded ->
                         ReservationList(
                             tab = uiState.tab,
                             content = content,
-                            scheduled = uiState.scheduled,
                             friend = uiState.friend,
                             ownerFilter = uiState.ownerFilter,
                             onCancelClick = onCancelClick,
-                            onScheduleCancel = onScheduleCancel,
-                            onScheduleTest = onScheduleTest,
                             onBookClick = onBookClick
                         )
                 }
@@ -224,12 +234,9 @@ private data class Owner(val name: String, val isFriend: Boolean)
 private fun ReservationList(
     tab: ReservationsTab,
     content: ReservationsContent.Loaded,
-    scheduled: List<ScheduledBooking>,
     friend: FriendReservations?,
     ownerFilter: OwnerFilter,
     onCancelClick: (Reservation) -> Unit,
-    onScheduleCancel: (String) -> Unit,
-    onScheduleTest: (String) -> Unit,
     onBookClick: () -> Unit
 ) {
     // Las del amigo solo en Próximas, mezcladas por fecha con las mías
@@ -239,6 +246,7 @@ private fun ReservationList(
         ReservationsTab.Upcoming -> if (sharing && ownerFilter == OwnerFilter.Friend) emptyList() else content.upcoming
         ReservationsTab.Past -> content.past
         ReservationsTab.Cancelled -> content.cancelled
+        ReservationsTab.Scheduled -> emptyList()
     }
     val friends = if (sharing && ownerFilter != OwnerFilter.Mine) {
         val now = LocalDateTime.now(Syltek.ZONE)
@@ -250,17 +258,14 @@ private fun ReservationList(
         .let { if (sharing) it.sortedBy { (reservation, _) -> reservation.start } else it }
     // La más cercana de las mías va destacada, como en el mock
     val nearest = mine.firstOrNull()
-    // Las programadas (solo mías) en Próximas, encima de las reservas reales
-    val showScheduled = tab == ReservationsTab.Upcoming && !(sharing && ownerFilter == OwnerFilter.Friend)
-    val shownScheduled = if (showScheduled) scheduled else emptyList()
-    if (reservations.isEmpty() && shownScheduled.isEmpty() && sharing && ownerFilter == OwnerFilter.Friend) {
+    if (reservations.isEmpty() && sharing && ownerFilter == OwnerFilter.Friend) {
         ScrollableMessage(
             icon = R.drawable.ic_ball,
             title = stringResource(R.string.reservations_empty_friend, friendName)
         )
         return
     }
-    if (reservations.isEmpty() && shownScheduled.isEmpty()) {
+    if (reservations.isEmpty()) {
         // En Próximas, el siguiente paso es reservar
         val upcoming = tab == ReservationsTab.Upcoming
         ScrollableMessage(
@@ -280,13 +285,6 @@ private fun ReservationList(
         verticalArrangement = Arrangement.spacedBy(10.dp),
         modifier = Modifier.fillMaxSize()
     ) {
-        items(shownScheduled, key = { "scheduled-${it.id}" }) { booking ->
-            ScheduledCard(
-                booking = booking,
-                onCancelClick = { onScheduleCancel(booking.id) },
-                onTestClick = { onScheduleTest(booking.id) }
-            )
-        }
         items(
             reservations,
             key = { (reservation, isFriend) -> if (isFriend) "friend-${reservation.id}" else reservation.id }
@@ -306,7 +304,42 @@ private fun ReservationList(
                 ReservationsTab.Past -> PastCard(reservation)
 
                 ReservationsTab.Cancelled -> CancelledCard(reservation)
+
+                // Van en ScheduledList
+                ReservationsTab.Scheduled -> Unit
             }
+        }
+    }
+}
+
+/** Pestaña Programadas: solo las mías, de la más cercana a la más lejana, como las guarda el repositorio. */
+@Composable
+private fun ScheduledList(
+    scheduled: List<ScheduledBooking>,
+    onScheduleCancel: (String) -> Unit,
+    onScheduleTest: (String) -> Unit,
+    onBookClick: () -> Unit
+) {
+    if (scheduled.isEmpty()) {
+        ScrollableMessage(
+            icon = R.drawable.ic_schedule,
+            title = stringResource(R.string.reservations_empty_scheduled),
+            message = stringResource(R.string.reservations_empty_scheduled_text),
+            action = { Button(onClick = onBookClick) { Text(stringResource(R.string.reservations_book)) } }
+        )
+        return
+    }
+    LazyColumn(
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = Modifier.fillMaxSize()
+    ) {
+        items(scheduled, key = { it.id }) { booking ->
+            ScheduledCard(
+                booking = booking,
+                onCancelClick = { onScheduleCancel(booking.id) },
+                onTestClick = { onScheduleTest(booking.id) }
+            )
         }
     }
 }
@@ -760,12 +793,14 @@ private fun LocalDateTime.timeUntil(): String {
 
 private fun ReservationsTab.labelRes(): Int = when (this) {
     ReservationsTab.Upcoming -> R.string.reservations_tab_upcoming
+    ReservationsTab.Scheduled -> R.string.reservations_tab_scheduled
     ReservationsTab.Past -> R.string.reservations_tab_past
     ReservationsTab.Cancelled -> R.string.reservations_tab_cancelled
 }
 
 private fun ReservationsTab.emptyRes(): Int = when (this) {
     ReservationsTab.Upcoming -> R.string.reservations_empty_upcoming
+    ReservationsTab.Scheduled -> R.string.reservations_empty_scheduled
     ReservationsTab.Past -> R.string.reservations_empty_past
     ReservationsTab.Cancelled -> R.string.reservations_empty_cancelled
 }
@@ -814,6 +849,38 @@ private fun ReservationsContentPreview() {
                         )
                     )
                 )
+            ),
+            onBookClick = {},
+            onTabSelect = {},
+            onOwnerFilterSelect = {},
+            onCancelClick = {},
+            onScheduleCancel = {},
+            onScheduleTest = {},
+            onRefresh = {},
+            onRetry = {},
+            onMessageShow = {}
+        )
+    }
+}
+
+@Preview(showBackground = true, widthDp = 360)
+@Preview(showBackground = true, widthDp = 360, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun ReservationsScheduledPreview() {
+    val booking = ScheduledBooking(
+        id = "1",
+        date = LocalDate.now(Syltek.ZONE).plusDays(9),
+        start = LocalTime.of(19, 0),
+        durationMinutes = 90,
+        courts = listOf(ScheduledCourt(1, "Pista 2", null), ScheduledCourt(2, "Pista 5", null)),
+        alternativeStart = LocalTime.of(20, 30)
+    )
+    PadelPratTheme {
+        ReservationsContent(
+            uiState = ReservationsUiState(
+                tab = ReservationsTab.Scheduled,
+                content = ReservationsContent.Loading,
+                scheduled = listOf(booking, booking.copy(id = "2", date = booking.date.plusDays(2)))
             ),
             onBookClick = {},
             onTabSelect = {},

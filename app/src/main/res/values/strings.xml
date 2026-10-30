@@ -165,6 +165,7 @@
 
     <string name="reservations_title">Mis reservas</string>
     <string name="reservations_tab_upcoming">Próximas</string>
+    <string name="reservations_tab_scheduled">Programadas</string>
     <string name="reservations_tab_past">Pasadas</string>
     <string name="reservations_tab_cancelled">Anuladas</string>
     <string name="reservations_tomorrow">Mañana</string>
@@ -206,6 +207,8 @@
     <string name="reservations_book">Reservar pista</string>
     <string name="reservations_empty_past">No tienes reservas en los últimos 6 meses</string>
     <string name="reservations_empty_cancelled">No tienes reservas anuladas</string>
+    <string name="reservations_empty_scheduled">No tienes reservas programadas</string>
+    <string name="reservations_empty_scheduled_text">En Reservar, elige un día que todavía no se ha abierto y programa la reserva: se intentará hacer en cuanto se abra.</string>
     <string name="reservations_error_unknown">No se han podido cargar tus reservas</string>
     <!-- Sin conexión, sobre la copia guardada: "Sin conexión. Son tus reservas de hace 2 h." -->
     <string name="reservations_offline">Sin conexión. Son tus reservas de %1$s.</string>

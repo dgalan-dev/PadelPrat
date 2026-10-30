@@ -76,7 +76,8 @@ apertura, y **respeta el límite** de 2 reservas activas del club.
 
 - **Reservar**: tras el último día abierto, más días (hasta 14) en el selector con un icono de reloj; al elegir
   uno se ve "Este día se abre el jueves a las 9:00" y el formulario para programar.
-- **Mis reservas → Próximas**: las programadas arriba, distintas de las reservas reales: borde discontinuo,
+- **Mis reservas → Programadas**: en su propia pestaña (al principio iban encima de Próximas), distintas de las
+  reservas reales: borde discontinuo,
   icono de reloj y etiqueta "Programada" (no lima), "Se intentará reservar el jueves 5 a las 9:00", las pistas
   por orden ("Pista 2 → Pista 5 → Pista 1") y "Cancelar programación".
 - **Permisos**: al entrar en la pantalla principal la primera vez, se piden las notificaciones y quitar la
@@ -111,5 +112,5 @@ apertura, y **respeta el límite** de 2 reservas activas del club.
 - Seguir adelante, respetando el límite de 2 reservas, y publicarla en GitHub con la función incluida.
 - Hasta 3 pistas por programación, a la hora elegida.
 - Programar hasta 14 días por delante.
-- Las programadas en Próximas, con un estilo distinto.
+- Las programadas en Próximas, con un estilo distinto (después, en su propia pestaña, Programadas).
 - Pedir los permisos al iniciar la app.
